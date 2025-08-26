@@ -61,6 +61,7 @@ logging.basicConfig(
 logger = logging.getLogger('DroneSchedulerV14')
 
 def is_windows(): return os.name == 'nt'
+def is_linux(): return os.name == 'posix'
 
 # --- CORE DATA STRUCTURES & ENUMS ---
 class TaskPriority(IntEnum):
@@ -77,6 +78,7 @@ class AlgorithmType(str, Enum):
     KYBER_CRYPTO = "kyber_crypto"
     SPHINCS = "sphincs"
     FALCON512 = "falcon512"
+    MAVPROXY = "mavproxy"
 
 ALGO_CODE_MAP: Dict[str, AlgorithmType] = {
     'c1': AlgorithmType.ASCON_128,
@@ -99,6 +101,11 @@ CRYPTO_SCRIPT_MAP: Dict[AlgorithmType, Tuple[str, float]] = {
     AlgorithmType.SPHINCS: ("drone_sphincs.py", 3.5),
     AlgorithmType.FALCON512: ("drone_falcon.py", 2.7),
 }
+
+# --- VENV PATHS (Linux defaults, overridable via env) ---
+CRYPTO_VENV = os.getenv('CENV_PATH', '/home/dev/cenv')
+DDOS_VENV   = os.getenv('NENV_PATH', '/home/dev/nenv')
+MAV_VENV    = os.getenv('MENV_PATH', '/home/dev/menv')
 
 @dataclass
 class ResourceProfile:
@@ -126,6 +133,7 @@ class Task:
     process: Optional[subprocess.Popen] = None
     pid: Optional[int] = None
     auto_restart: bool = False
+    capture_output: bool = False
 
 @dataclass
 class MQTTMessage:
@@ -299,18 +307,23 @@ def terminate_process_tree(proc: subprocess.Popen):
         except Exception: pass
 
 class DroneScheduler:
-    def __init__(self, drone_id: str, broker: str, port: int, initial_battery: float = 100.0):
-        self.drone_id = drone_id
+    def __init__(self, initial_battery: float = 100.0):
+        # Resolve static identifiers and broker from ip_config
+        self.drone_id = getattr(ip_config, 'DRONE_ID', 'drone1') if ip_config else 'drone1'
+        broker_host = getattr(ip_config, 'GCS_HOST', 'localhost') if ip_config else 'localhost'
+        broker_port = getattr(ip_config, 'BROKER_PORT', 8883) if ip_config and hasattr(ip_config, 'BROKER_PORT') else 8883
+
         self.state = SystemState(battery_percent=float(initial_battery))
-        self.mqtt = MQTTClient(drone_id, self._queue_message, broker, port)
-        self.msg_queue: "queue.Queue[MQTTMessage]" = queue.Queue()
+        self.mqtt = MQTTClient(self.drone_id, self._queue_message, broker_host, broker_port)
+        self.msg_queue = queue.Queue()
         self.lock = threading.RLock()
         self.running = False
-        self.tasks: Dict[str, Task] = {}
-        self.crypto_task_id: Optional[str] = None
-        self.current_crypto: Optional[AlgorithmType] = None
-        self.monitor_thread: Optional[threading.Thread] = None
-        self.msg_thread: Optional[threading.Thread] = None
+        self.tasks = {}
+        self.crypto_task_id = None
+        self.current_crypto = None
+        self.mavproxy_task_id = None
+        self.monitor_thread = None
+        self.msg_thread = None
         # metrics CSV
         self._csv_path = os.path.join(HERE, 'logs', f'metrics_{self.drone_id}.csv')
         try:
@@ -397,30 +410,72 @@ class DroneScheduler:
     def _create_crypto_task(self, algo: AlgorithmType) -> Task:
         script, pwr = CRYPTO_SCRIPT_MAP.get(algo, CRYPTO_SCRIPT_MAP[AlgorithmType.ASCON_128])
         script_path = os.path.join(HERE, script)
-        py = sys.executable
-        if is_windows():
+        if is_linux():
+            py = os.path.join(CRYPTO_VENV, 'bin', 'python')
             cmd = [py, script_path]
         else:
+            py = sys.executable
             cmd = [py, script_path]
         tid = f"crypto-{algo.value}-{int(time.time())}"
         return Task(tid, f"Crypto {algo.value}", cmd, TaskPriority.HIGH, algo, ResourceProfile(pwr), auto_restart=True)
+
+    def _create_mavproxy_task(self) -> Task:
+        """Start MAVProxy using menv and the standard dual-out configuration."""
+        if is_linux():
+            py = os.path.join(MAV_VENV, 'bin', 'python')
+            exe = os.path.join(MAV_VENV, 'bin', 'mavproxy.py')
+            cmd = [py, exe,
+                   '--master=/dev/ttyACM0',
+                   '--baudrate=921600',
+                   '--out=udp:127.0.0.1:5010',
+                   '--out=udpin:0.0.0.0:14551']
+        else:
+            # Best-effort on Windows: assume mavproxy.py in PATH
+            cmd = ['mavproxy.py',
+                   '--master=COM3',
+                   '--baudrate=115200',
+                   '--out=udp:127.0.0.1:5010',
+                   '--out=udpin:0.0.0.0:14551']
+        tid = f"mavproxy-{int(time.time())}"
+        return Task(tid, 'MAVProxy', cmd, TaskPriority.CRITICAL, AlgorithmType.MAVPROXY, ResourceProfile(1.2), auto_restart=True, capture_output=True)
     # --- task control ---
     def _start_task(self, task: Task) -> bool:
         if task.id in self.tasks: return False
         try:
             logger.info(f"Starting task: {task.name}")
             if is_windows():
-                task.process = subprocess.Popen(task.command, creationflags=subprocess.CREATE_NEW_PROCESS_GROUP)
+                creationflags = getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)
+                task.process = subprocess.Popen(task.command, creationflags=creationflags, stdout=(subprocess.PIPE if task.capture_output else subprocess.DEVNULL), stderr=subprocess.STDOUT, text=True)
             else:
-                task.process = subprocess.Popen(task.command, preexec_fn=os.setsid)
+                task.process = subprocess.Popen(task.command, preexec_fn=os.setsid, stdout=(subprocess.PIPE if task.capture_output else subprocess.DEVNULL), stderr=subprocess.STDOUT, text=True)
             task.pid = task.process.pid
             task.start_time = time.time()
             task.status = 'RUNNING'
             self.tasks[task.id] = task
+            # Try to apply niceness on Linux for priority bias
+            if is_linux() and psutil and task.pid is not None:
+                try:
+                    p = psutil.Process(task.pid)
+                    nice_map = {TaskPriority.CRITICAL: -5, TaskPriority.HIGH: 0, TaskPriority.MEDIUM: 5}
+                    p.nice(nice_map.get(task.priority, 0))
+                except Exception:
+                    pass
+            # Optionally stream output to logs for capture_output tasks
+            if task.capture_output and task.process.stdout:
+                threading.Thread(target=self._stream_task_output, args=(task,), daemon=True).start()
             return True
         except Exception as e:
             logger.error(f"Task start failed: {e}")
             return False
+
+    def _stream_task_output(self, task: Task):
+        try:
+            if not task.process or not task.process.stdout:
+                return
+            for line in task.process.stdout:
+                logger.info(f"[{task.name}] {line.rstrip()}")
+        except Exception:
+            pass
     def _stop_task(self, task_id: str):
         task = self.tasks.pop(task_id, None)
         if not task: return
@@ -433,6 +488,8 @@ class DroneScheduler:
         finally:
             if self.crypto_task_id == task_id:
                 self.crypto_task_id = None; self.current_crypto = None
+            if self.mavproxy_task_id == task_id:
+                self.mavproxy_task_id = None
     # --- monitoring ---
     def _monitor_loop(self):
         while self.running:
@@ -493,16 +550,14 @@ class DroneScheduler:
 
 def parse_args():
     p = argparse.ArgumentParser(description='Drone Scheduler v14 (MQTT+TLS)')
-    p.add_argument('--drone-id', default=os.environ.get('DRONE_ID','drone1'))
-    p.add_argument('--broker', default=(getattr(ip_config,'GCS_HOST','localhost') if ip_config else 'localhost'))
-    p.add_argument('--port', type=int, default=8883)
     p.add_argument('--start-crypto', choices=list(ALGO_CODE_MAP.keys()), help='Start with crypto code c1..c8')
     p.add_argument('--battery', type=float, default=100.0, help='Initial battery percentage')
+    p.add_argument('--mavproxy', action='store_true', help='Start standard MAVProxy (menv)')
     return p.parse_args()
 
 def main():
     args = parse_args()
-    sched = DroneScheduler(args.drone_id, args.broker, args.port, initial_battery=args.battery)
+    sched = DroneScheduler(initial_battery=args.battery)
     def _sig(_s,_f): sched.stop(); sys.exit(0)
     try:
         signal.signal(signal.SIGINT, _sig)
@@ -513,7 +568,13 @@ def main():
     sched.start()
     if args.start_crypto:
         sched._apply_crypto_code(args.start_crypto)
-    logger.info(f"Running as {args.drone_id} -> broker {args.broker}:{args.port}")
+    if args.mavproxy:
+        t = sched._create_mavproxy_task()
+        sched._start_task(t)
+        sched.mavproxy_task_id = t.id
+    broker_host = getattr(ip_config, 'GCS_HOST', 'localhost') if ip_config else 'localhost'
+    broker_port = getattr(ip_config, 'BROKER_PORT', 8883) if ip_config and hasattr(ip_config, 'BROKER_PORT') else 8883
+    logger.info(f"Running as {sched.drone_id} -> broker {broker_host}:{broker_port}")
     try:
         while True:
             time.sleep(10)

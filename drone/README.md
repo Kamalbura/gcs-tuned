@@ -4,10 +4,13 @@ A mission-grade Drone-side scheduler that reacts to GCS directives, maintains se
 
 ## Narrative: Drone POV
 
-The drone is the action-plane. It follows GCS directives, switches crypto when told, and keeps the link alive under constrained power and thermal budgets. It reports heartbeats, status, and telemetry to give the control-plane real-time awareness.
 
-## Two flavors included
+### Linux scheduling (brief)
 
+- Linux uses the Completely Fair Scheduler (CFS). User space can nudge CPU share by setting “niceness”:
+  - Lower nice (e.g., negative) means higher priority for CPU time; higher nice yields CPU to others.
+  - v14 doesn’t change kernel policies; it only sets niceness for its child processes.
+- We keep it simple and predictable: only CPU niceness is adjusted; no special cgroups/rt policies.
 - Drone MQTT Scheduler GUI: `drone_mqtt_scheduler.py` (simple, interactive)
 - Drone UAV Scheduler v14: `drone_scheduler_v14.py` (robust, queue-based, TLS-only)
 
@@ -28,36 +31,21 @@ flowchart LR
   subgraph GCS Host
     GUI[GCS Scheduler]
   end
-
   UI -- start/stop --> P
-  V14 -- orchestrate --> P
   V14 -- publish hb/status --> M
-  M <--> B
   B <--> GUI
   P <--> FC
 ```
-
-## Scheduling model (Drone v14)
-
 - Queue-based message processing (thread-safe): MQTT callbacks enqueue; main processor handles logic.
 - Process lifecycle governance: start/stop crypto proxies with auto-restart for resilience.
-- Reliability patterns: TLS MQTT, CA validation, exponential backoff, retained status.
-- Metrics and observability: CSV logs for CPU, battery, temperature, and current crypto.
-
-### Session timeline
 
 ```mermaid
-gantt
-  dateFormat  X
-  title Drone v14 Timeline
   section Init
   Cert discovery (TLS)    :done, 0, 1
   MQTT connect            :done, 1, 1
-  section Operate
   Heartbeats/Status       :active, 2, 6
   Crypto Switch (cN)      : 3, 1
   Auto-restart crashed    : 4, 3
-```
 
 ## Message flows
 
@@ -118,7 +106,8 @@ sequenceDiagram
 
 ## IP configuration (runtime vs persistent)
 
-- Runtime: update in-memory via `ip_config.set_hosts_runtime()` (GUI and v14 use this internally if needed)
+- In `drone/ip_config.py`: set `GCS_HOST` (broker host/IP) and `DRONE_ID` (stable id used in topics and cert filenames). Optionally define `BROKER_PORT` (defaults to 8883).
+- Runtime: update in-memory via `ip_config.set_hosts_runtime()` (GUI can use this if needed)
 - Persistent: edits `drone/ip_config.py` in-place with timestamped comments
 
 ## Try it
@@ -126,10 +115,32 @@ sequenceDiagram
 - Install deps:
   - `pip install -r drone/requirements.txt`
 - Ensure certs exist; set broker IP (GCS_HOST) in `ip_config.py` or via CLI `--broker`
-- Run v14:
-  - `python drone/drone_scheduler_v14.py --drone-id drone1 --broker 192.168.0.103 --port 8883 --start-crypto c6`
+- Run v14 (uses DRONE_ID and GCS_HOST from `drone/ip_config.py`):
+  - `python drone/drone_scheduler_v14.py --start-crypto c6`
+  - Add `--mavproxy` to also launch the flight stack bridge.
 - Or run GUI:
   - `python drone/drone_mqtt_scheduler.py`
+
+### Standard MAVProxy command (Linux)
+
+Using dedicated virtual envs: cenv (crypto), nenv (DDoS), menv (MAVProxy).
+
+- menv path can be set via env var `MENV_PATH` (defaults to `/home/dev/menv`).
+- Scheduler v14 uses this standard when `--mavproxy` is passed:
+
+```
+mavproxy.py --master=/dev/ttyACM0 --baudrate 921600 --out=udp:127.0.0.1:5010 --out=udpin:0.0.0.0:14551
+```
+
+On Linux it runs via menv’s python: `<menv>/bin/python <menv>/bin/mavproxy.py ...`.
+
+### Scheduling and priorities (Linux)
+
+- v14 runs tasks as subprocesses and biases CPU scheduling with niceness:
+  - Critical: nice ≈ -5 (higher priority)
+  - High: nice ≈ 0
+  - Medium: nice ≈ +5
+- This keeps MAVProxy and active crypto responsive while background tasks yield time.
 
 ---
 For GCS-side orchestration details and GUI controls, see `../gcs/README.md`.
