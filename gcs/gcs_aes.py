@@ -19,7 +19,7 @@
 import socket
 import threading
 import os
-from Crypto.Cipher import AES
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from ip_config import *
 
 ## 1. CONFIGURATION ##
@@ -27,7 +27,8 @@ from ip_config import *
 # SECURITY WARNING: This is a pre-shared key (PSK). In a real-world system,
 # this should be derived from a PQC key exchange (like Kyber).
 # Key must be 32 bytes for AES-256.
-PSK_AES = b'ThisIs_A_VerySecure_32ByteKey!!'
+# Must be exactly 32 bytes for AES-256
+PSK_AES = b'ThisIs_A_VerySecure_32ByteKey!!!'
 
 ## 2. CRYPTOGRAPHY FUNCTIONS ##
 
@@ -35,13 +36,13 @@ def encrypt_message(plaintext):
     """
     Encrypts a plaintext message using AES-256-GCM.
     A new random 12-byte nonce is generated for each message.
-    The nonce is prepended to the ciphertext.
-    [nonce (12 bytes)] + [ciphertext + tag (16 bytes)]
+    The nonce is prepended to the ciphertext+tag returned by AESGCM.
+    [nonce (12 bytes)] + [ciphertext || tag (16 bytes)]
     """
     nonce = os.urandom(NONCE_IV_SIZE)
-    cipher = AES.new(PSK_AES, AES.MODE_GCM, nonce=nonce)
-    ciphertext, tag = cipher.encrypt_and_digest(plaintext)
-    return nonce + ciphertext + tag
+    aesgcm = AESGCM(PSK_AES)
+    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+    return nonce + ciphertext
 
 def decrypt_message(encrypted_message):
     """
@@ -51,10 +52,9 @@ def decrypt_message(encrypted_message):
     """
     try:
         nonce = encrypted_message[:NONCE_IV_SIZE]
-        ciphertext = encrypted_message[NONCE_IV_SIZE:-16]
-        tag = encrypted_message[-16:]
-        cipher = AES.new(PSK_AES, AES.MODE_GCM, nonce=nonce)
-        plaintext = cipher.decrypt_and_verify(ciphertext, tag)
+        ciphertext = encrypted_message[NONCE_IV_SIZE:]
+        aesgcm = AESGCM(PSK_AES)
+        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
         return plaintext
     except Exception as e:
         print(f"[AES GCS] Decryption failed: {e}")

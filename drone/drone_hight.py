@@ -16,7 +16,10 @@ import socket
 import threading
 import os
 from Crypto.Util.Padding import pad, unpad
-from hight_CBC import cbc_hight_encryption, cbc_hight_decryption
+try:
+    from drneha.hight.hight_CBC import cbc_hight_encryption, cbc_hight_decryption
+except Exception:
+    from hight_CBC import cbc_hight_encryption, cbc_hight_decryption
 from ip_config import *
 
 ## 1. CONFIGURATION ##
@@ -27,8 +30,8 @@ BLOCK_SIZE = 8
 def encrypt_message(plaintext):
     """Encrypts using HIGHT-CBC, prepending a random 8-byte IV."""
     iv = list(os.urandom(BLOCK_SIZE))
-    padded_plaintext = list(pad(plaintext, BLOCK_SIZE))
-    ciphertext = cbc_hight_encryption(padded_plaintext, iv, PSK_HIGHT_MK)
+    padded = pad(plaintext, BLOCK_SIZE)
+    ciphertext = cbc_hight_encryption(list(padded), iv, PSK_HIGHT_MK)
     return bytes(iv) + bytes(ciphertext)
 
 def decrypt_message(encrypted_message):

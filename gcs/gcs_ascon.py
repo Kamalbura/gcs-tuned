@@ -23,9 +23,7 @@
 import socket
 import threading
 import os
-from Crypto.Cipher import AES  # Using AES as a fallback since ASCON not available
-import hmac
-import hashlib
+from drneha.ascon.ascon import ascon_encrypt, ascon_decrypt
 from ip_config import *
 
 ## 1. CONFIGURATION ##
@@ -34,40 +32,34 @@ from ip_config import *
 # this key should be generated dynamically and exchanged securely, for example,
 # using a Post-Quantum Key Encapsulation Mechanism (KEM) like Kyber.
 # For this example, we use a static key for simplicity.
-# Key must be 16 bytes for AES-128.
-
-PSK_ASCON = b'ThisIsA_16ByteKey'
+# ASCON-128 uses a 16-byte key and a 16-byte nonce
+# Exactly 16 bytes
+PSK_ASCON = b'ThisIsA16ByteKey'
+ASCON_NONCE_SIZE = 16
 
 ## 2. CRYPTOGRAPHY FUNCTIONS ##
 
 def encrypt_message(plaintext):
     """
-    Encrypts a plaintext message using AES-GCM as a fallback for ASCON.
-    A new random nonce is generated for each message for security.
-    The nonce is prepended to the ciphertext.
-    [nonce (12 bytes)] + [ciphertext] + [tag (16 bytes)]
+    Encrypts a plaintext message using ASCON-128 (AEAD).
+    Frames as [nonce (16)] + [ciphertext || tag (16)].
     """
-    print("[NOTE] Using AES-GCM as fallback for ASCON")
-    nonce = os.urandom(NONCE_IV_SIZE)
-    cipher = AES.new(PSK_ASCON, AES.MODE_GCM, nonce=nonce)
-    ciphertext, tag = cipher.encrypt_and_digest(plaintext)
-    return nonce + ciphertext + tag
+    nonce = os.urandom(ASCON_NONCE_SIZE)
+    ct_tag = ascon_encrypt(PSK_ASCON, nonce, b"", plaintext, variant="Ascon-128")
+    return nonce + ct_tag
 
 def decrypt_message(encrypted_message):
     """
-    Decrypts an incoming message using AES-GCM as a fallback for ASCON.
-    Splits the nonce from the message, then decrypts and verifies.
-    Returns the plaintext or None if verification fails.
+    Decrypts an incoming message using ASCON-128.
+    Splits the 16-byte nonce and verifies the tag.
+    Returns plaintext or None on failure.
     """
     try:
-        print("[NOTE] Using AES-GCM as fallback for ASCON")
-        nonce = encrypted_message[:NONCE_IV_SIZE]
-        ciphertext = encrypted_message[NONCE_IV_SIZE:-16]
-        tag = encrypted_message[-16:]
-        cipher = AES.new(PSK_ASCON, AES.MODE_GCM, nonce=nonce)
-        plaintext = cipher.decrypt_and_verify(ciphertext, tag)
+        nonce = encrypted_message[:ASCON_NONCE_SIZE]
+        ct_tag = encrypted_message[ASCON_NONCE_SIZE:]
+        plaintext = ascon_decrypt(PSK_ASCON, nonce, b"", ct_tag, variant="Ascon-128")
         return plaintext
-    except (ValueError, KeyError) as e:
+    except Exception as e:
         print(f"[ASCON GCS] Decryption failed: {e}")
         return None
 
@@ -108,7 +100,7 @@ def gcs_to_drone_thread():
 
 if __name__ == "__main__":
     print("--- GCS ASCON PROXY ---")
-    print("[NOTE] Using AES-GCM as fallback for ASCON")
+    print("[ASCON] Using Ascon-128 (AEAD)")
     
     # Start the two networking threads
     thread1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)

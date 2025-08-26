@@ -23,41 +23,32 @@
 import socket
 import threading
 import os
-from Cryptodome.Cipher import ASCON
+from drneha.ascon.ascon import ascon_encrypt, ascon_decrypt
 from ip_config import *
 
 ## 1. CONFIGURATION ##
 
-# SECURITY WARNING: This key MUST be identical to the one in gcs_ascon.py.
-PSK_ASCON = b'ThisIsA_16ByteKey'
+# SECURITY WARNING: Must match GCS. ASCON-128: 16-byte key
+# Exactly 16 bytes
+PSK_ASCON = b'ThisIsA16ByteKey'
+ASCON_NONCE_SIZE = 16
 
 ## 2. CRYPTOGRAPHY FUNCTIONS ##
 
 def encrypt_message(plaintext):
-    """
-    Encrypts a plaintext message using ASCON-128.
-    A new random nonce is generated for each message for security.
-    The nonce is prepended to the ciphertext.
-    [nonce (16 bytes)] + [ciphertext + tag]
-    """
-    nonce = os.urandom(16)
-    cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
-    ciphertext, tag = cipher.encrypt_and_digest(plaintext)
-    return nonce + ciphertext + tag
+    """Encrypts using ASCON-128, framing [nonce16 || ct||tag]."""
+    nonce = os.urandom(ASCON_NONCE_SIZE)
+    ct_tag = ascon_encrypt(PSK_ASCON, nonce, b"", plaintext, variant="Ascon-128")
+    return nonce + ct_tag
 
 def decrypt_message(encrypted_message):
-    """
-    Decrypts an incoming message using ASCON-128.
-    Splits the nonce from the message, then decrypts and verifies.
-    Returns the plaintext or None if verification fails.
-    """
+    """Decrypts using ASCON-128, splitting 16-byte nonce and verifying tag."""
     try:
-        nonce = encrypted_message[:16]
-        ciphertext_with_tag = encrypted_message[16:]
-        cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
-        plaintext = cipher.decrypt_and_verify(ciphertext_with_tag[:-16], ciphertext_with_tag[-16:])
+        nonce = encrypted_message[:ASCON_NONCE_SIZE]
+        ct_tag = encrypted_message[ASCON_NONCE_SIZE:]
+        plaintext = ascon_decrypt(PSK_ASCON, nonce, b"", ct_tag, variant="Ascon-128")
         return plaintext
-    except (ValueError, KeyError) as e:
+    except Exception as e:
         print(f"[ASCON Drone] Decryption failed: {e}")
         return None
 

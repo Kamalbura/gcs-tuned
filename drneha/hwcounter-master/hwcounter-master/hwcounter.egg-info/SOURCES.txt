@@ -1,0 +1,9 @@
+LICENSE
+README.md
+hwcounter.c
+setup.cfg
+setup.py
+hwcounter.egg-info/PKG-INFO
+hwcounter.egg-info/SOURCES.txt
+hwcounter.egg-info/dependency_links.txt
+hwcounter.egg-info/top_level.txt

@@ -18,8 +18,11 @@
 import socket
 import threading
 import os
-from Cryptodome.Util.Padding import pad, unpad
-from custom_speck import Python_SPECK
+from Crypto.Util.Padding import pad, unpad
+try:
+    from .drneha.new_git_repos.Speck.speck import Python_SPECK
+except Exception:
+    from drneha.new_git_repos.Speck.speck import Python_SPECK
 from ip_config import *
 
 ## 1. CONFIGURATION ##

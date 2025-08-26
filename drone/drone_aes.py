@@ -25,7 +25,8 @@ from ip_config import *
 ## 1. CONFIGURATION ##
 
 # SECURITY WARNING: This key MUST be identical to the one in gcs_aes.py.
-PSK_AES = b'ThisIs_A_VerySecure_32ByteKey!!'
+# Must be exactly 32 bytes for AES-256
+PSK_AES = b'ThisIs_A_VerySecure_32ByteKey!!!'
 
 ## 2. CRYPTOGRAPHY FUNCTIONS ##
 
