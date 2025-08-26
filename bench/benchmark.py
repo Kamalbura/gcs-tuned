@@ -15,7 +15,7 @@ Examples:
   Raspberry Pi (Drone on Pi):
     python3 bench/benchmark.py --algo ascon --iters 2000 --size 256
 
-Algorithms: aes, ascon, camellia, hight, speck, kyber, kyber_hybrid, dilithium, falcon, sphincs
+Algorithms: aes, ascon, camellia, hight, speck, kyber, dilithium, falcon, sphincs
 """
 
 import argparse
@@ -69,18 +69,7 @@ def bench_kyber_normal(size: int, iters: int):
     return bench_symmetric(G['g'], d, size, iters)
 
 
-def bench_kyber_hybrid(size: int, iters: int):
-    # Start GCS server (performs Kyber1024 exchange at import time)
-    G = {}
-    def start_gcs():
-        import gcs.gcs_kyber_hybrid as g
-        G['g'] = g
-    th = threading.Thread(target=start_gcs)
-    th.start()
-    time.sleep(1.5)
-    import drone.drone_kyber_hybrid as d
-    th.join(timeout=5)
-    return bench_symmetric(G['g'], d, size, iters)
+# removed kyber_hybrid
 
 
 def bench_signature(gcs_module_name: str, drone_module_name: str, size: int, iters: int):
@@ -123,7 +112,7 @@ def main():
     p = argparse.ArgumentParser(description="Benchmark decrypt/verify times for GCS/Drone crypto proxies")
     p.add_argument("--algo", required=True, choices=[
         "aes", "ascon", "camellia", "hight", "speck",
-        "kyber", "kyber_hybrid",
+    "kyber",
         "dilithium", "falcon", "sphincs",
     ])
     p.add_argument("--iters", type=int, default=1000, help="Iterations per timing loop")
@@ -162,9 +151,7 @@ def main():
     elif algo == "kyber":
         g_us, d_us = bench_kyber_normal(size, iters)
         print(f"ML-KEM-768 (Kyber) decrypt avg (Drone->GCS): {g_us:.1f} us ; (GCS->Drone): {d_us:.1f} us")
-    elif algo == "kyber_hybrid":
-        g_us, d_us = bench_kyber_hybrid(size, iters)
-        print(f"Kyber hybrid decrypt avg (Drone->GCS): {g_us:.1f} us ; (GCS->Drone): {d_us:.1f} us")
+    # kyber_hybrid removed
     elif algo == "dilithium":
         g_us, d_us = bench_signature('gcs.gcs_dilithium', 'drone.drone_dilithium', size, iters)
         print(f"Dilithium verify avg (GCS verifying Drone): {g_us:.1f} us ; (Drone verifying GCS): {d_us:.1f} us")

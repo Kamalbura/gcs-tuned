@@ -70,34 +70,34 @@ class TaskPriority(IntEnum):
 
 class AlgorithmType(str, Enum):
     ASCON_128 = "ascon_128"
-    KYBER_CRYPTO = "kyber_crypto"
-    DILITHIUM3 = "dilithium3"
-    FALCON512 = "falcon512"
-    CAMELLIA = "camellia"
     SPECK = "speck"
+    CAMELLIA = "camellia"
     HIGHT = "hight"
-    AES_GCM = "aes_gcm"
+    DILITHIUM3 = "dilithium3"
+    KYBER_CRYPTO = "kyber_crypto"
+    SPHINCS = "sphincs"
+    FALCON512 = "falcon512"
 
 ALGO_CODE_MAP: Dict[str, AlgorithmType] = {
     'c1': AlgorithmType.ASCON_128,
-    'c2': AlgorithmType.KYBER_CRYPTO,
-    'c3': AlgorithmType.DILITHIUM3,
-    'c4': AlgorithmType.FALCON512,
-    'c5': AlgorithmType.CAMELLIA,
-    'c6': AlgorithmType.SPECK,
-    'c7': AlgorithmType.HIGHT,
-    'c8': AlgorithmType.AES_GCM,
+    'c2': AlgorithmType.SPECK,
+    'c3': AlgorithmType.CAMELLIA,
+    'c4': AlgorithmType.HIGHT,
+    'c5': AlgorithmType.DILITHIUM3,
+    'c6': AlgorithmType.KYBER_CRYPTO,
+    'c7': AlgorithmType.SPHINCS,
+    'c8': AlgorithmType.FALCON512,
 }
 
 CRYPTO_SCRIPT_MAP: Dict[AlgorithmType, Tuple[str, float]] = {
     AlgorithmType.ASCON_128: ("drone_ascon.py", 1.5),
-    AlgorithmType.KYBER_CRYPTO: ("drone_kyber_hybrid.py", 2.5),
-    AlgorithmType.DILITHIUM3: ("drone_dilithium.py", 2.6),
-    AlgorithmType.FALCON512: ("drone_falcon.py", 2.7),
-    AlgorithmType.CAMELLIA: ("drone_camellia.py", 2.2),
     AlgorithmType.SPECK: ("drone_speck.py", 2.8),
+    AlgorithmType.CAMELLIA: ("drone_camellia.py", 2.2),
     AlgorithmType.HIGHT: ("drone_hight.py", 2.8),
-    AlgorithmType.AES_GCM: ("drone_aes.py", 2.0),
+    AlgorithmType.DILITHIUM3: ("drone_dilithium.py", 2.6),
+    AlgorithmType.KYBER_CRYPTO: ("drone_kyber.py", 2.5),
+    AlgorithmType.SPHINCS: ("drone_sphincs.py", 3.5),
+    AlgorithmType.FALCON512: ("drone_falcon.py", 2.7),
 }
 
 @dataclass

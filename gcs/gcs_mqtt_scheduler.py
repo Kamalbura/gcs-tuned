@@ -81,15 +81,15 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "core": {"script": "gcs_pymavlink_final.py", "args": ["--no-input"]},
     "mavlink": {"rx_uri": "udp:0.0.0.0:14550", "tx_uri": "udpout:127.0.0.1:14551", "sysid": 255, "compid": 190},
     "crypto_map": {
-        # Align to proxies in this repo (under gcs/)
+        # Standardized c1..c8 mapping
         "c1": {"name": "ASCON_128", "script": "gcs_ascon.py"},
-        "c2": {"name": "KYBER_CRYPTO (hybrid)", "script": "gcs_kyber_hybrid.py"},
-        "c3": {"name": "DILITHIUM3", "script": "gcs_dilithium.py"},
-        "c4": {"name": "FALCON512", "script": "gcs_falcon.py"},
-        "c5": {"name": "CAMELLIA", "script": "gcs_camellia.py"},
-        "c6": {"name": "SPECK", "script": "gcs_speck.py"},
-        "c7": {"name": "HIGHT", "script": "gcs_hight.py"},
-        "c8": {"name": "AES-256-GCM", "script": "gcs_aes.py"}
+        "c2": {"name": "SPECK", "script": "gcs_speck.py"},
+        "c3": {"name": "CAMELLIA", "script": "gcs_camellia.py"},
+        "c4": {"name": "HIGHT", "script": "gcs_hight.py"},
+        "c5": {"name": "DILITHIUM3", "script": "gcs_dilithium.py"},
+        "c6": {"name": "KYBER (ML-KEM-768)", "script": "gcs_kyber.py"},
+        "c7": {"name": "SPHINCS+", "script": "gcs_sphincs.py"},
+        "c8": {"name": "FALCON512", "script": "gcs_falcon.py"}
     }
 }
 

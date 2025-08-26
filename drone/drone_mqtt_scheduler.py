@@ -72,15 +72,15 @@ DEFAULTS: Dict[str, Any] = {
         "verify_hostname": False
     },
     "crypto_map": {
-        # Align to proxies in this repo (under drone/)
+        # Standardized c1..c8 mapping
         "c1": {"name": "ASCON_128", "script": "drone_ascon.py"},
-        "c2": {"name": "KYBER_CRYPTO (hybrid)", "script": "drone_kyber_hybrid.py"},
-        "c3": {"name": "DILITHIUM3", "script": "drone_dilithium.py"},
-        "c4": {"name": "FALCON512", "script": "drone_falcon.py"},
-        "c5": {"name": "CAMELLIA", "script": "drone_camellia.py"},
-        "c6": {"name": "SPECK", "script": "drone_speck.py"},
-        "c7": {"name": "HIGHT", "script": "drone_hight.py"},
-        "c8": {"name": "AES-256-GCM", "script": "drone_aes.py"}
+        "c2": {"name": "SPECK", "script": "drone_speck.py"},
+        "c3": {"name": "CAMELLIA", "script": "drone_camellia.py"},
+        "c4": {"name": "HIGHT", "script": "drone_hight.py"},
+        "c5": {"name": "DILITHIUM3", "script": "drone_dilithium.py"},
+        "c6": {"name": "KYBER (ML-KEM-768)", "script": "drone_kyber.py"},
+        "c7": {"name": "SPHINCS+", "script": "drone_sphincs.py"},
+        "c8": {"name": "FALCON512", "script": "drone_falcon.py"}
     }
 }
 

@@ -17,7 +17,7 @@
 #   4. If a proxy is already running, it gracefully terminates it. This is
 #      CRITICAL to free up the MAVLink network ports.
 #   5. It looks up the command code (e.g., "c2") in its script map and starts
-#      the corresponding proxy script (e.g., "gcs_kyber_hybrid.py") as a new
+#      the corresponding proxy script (e.g., "gcs_kyber.py") as a new
 #      subprocess.
 #   6. Sends a confirmation reply ("OK" or "ERROR") back to the controller.
 #
@@ -44,12 +44,12 @@ MANAGER_PORT = 5900         # Port for receiving commands
 # codes (c1, c2, etc.) to the actual script filenames.
 CRYPTO_MAP = {
     "c1": "gcs_ascon.py",
-    "c2": "gcs_aes.py",
+    "c2": "gcs_speck.py",
     "c3": "gcs_camellia.py",
-    "c4": "gcs_speck.py",
-    "c5": "gcs_hight.py",
-    "c6": "gcs_kyber_hybrid.py",
-    "c7": "gcs_dilithium.py",
+    "c4": "gcs_hight.py",
+    "c5": "gcs_dilithium.py",
+    "c6": "gcs_kyber.py",
+    "c7": "gcs_sphincs.py",
     "c8": "gcs_falcon.py",
 }
 

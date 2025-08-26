@@ -16,10 +16,10 @@ The drone is the action-plane. It follows GCS directives, switches crypto when t
 ```mermaid
 flowchart LR
   subgraph Drone Host
-    UI[Drone GUI (optional)]
+    UI[Drone GUI]
     V14[Drone Scheduler v14]
-    M[MQTT Client (TLS)]
-    P[Crypto Proxy (drone_*.py)]
+    M[MQTT Client TLS]
+    P[Crypto Proxy drone]
     FC[Flight Controller]
   end
   subgraph Broker
@@ -88,16 +88,16 @@ sequenceDiagram
 
 ## Crypto codes and mappings (Drone)
 
-| Code | Algorithm       | Script                 |
-|------|-----------------|------------------------|
-| c1   | ASCON‑128       | drone_ascon.py         |
-| c2   | Kyber Hybrid    | drone_kyber_hybrid.py  |
-| c3   | Dilithium       | drone_dilithium.py     |
-| c4   | Falcon‑512      | drone_falcon.py        |
-| c5   | Camellia‑CBC    | drone_camellia.py      |
-| c6   | Speck‑CBC       | drone_speck.py         |
-| c7   | HIGHT‑CBC       | drone_hight.py         |
-| c8   | AES‑256‑GCM     | drone_aes.py           |
+| Code | Algorithm         | Script               |
+|------|-------------------|----------------------|
+| c1   | ASCON‑128         | drone_ascon.py       |
+| c2   | Speck‑CBC         | drone_speck.py       |
+| c3   | Camellia‑CBC      | drone_camellia.py    |
+| c4   | HIGHT‑CBC         | drone_hight.py       |
+| c5   | Dilithium         | drone_dilithium.py   |
+| c6   | Kyber (ML‑KEM‑768)| drone_kyber.py       |
+| c7   | SPHINCS+          | drone_sphincs.py     |
+| c8   | Falcon‑512        | drone_falcon.py      |
 
 ## MQTT topics (Drone)
 
@@ -127,7 +127,7 @@ sequenceDiagram
   - `pip install -r drone/requirements.txt`
 - Ensure certs exist; set broker IP (GCS_HOST) in `ip_config.py` or via CLI `--broker`
 - Run v14:
-  - `python drone/drone_scheduler_v14.py --drone-id drone1 --broker 192.168.0.103 --port 8883 --start-crypto c2`
+  - `python drone/drone_scheduler_v14.py --drone-id drone1 --broker 192.168.0.103 --port 8883 --start-crypto c6`
 - Or run GUI:
   - `python drone/drone_mqtt_scheduler.py`
 

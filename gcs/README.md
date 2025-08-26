@@ -12,8 +12,8 @@ In a live mission, the GCS is the control-plane brain. It orchestrates crypto pr
 flowchart LR
   subgraph GCS Host
     UI[GCS Scheduler GUI]
-    M[MQTT Client (TLS)]
-    P[Crypto Proxy (gcs_*.py)]
+  M[MQTT Client TLS]
+  P[Crypto Proxy gcs]
     C[MAVLink Core]
   end
   subgraph Broker
@@ -105,16 +105,16 @@ sequenceDiagram
 
 ## Crypto codes and mappings
 
-| Code | Algorithm       | Script            |
-|------|-----------------|-------------------|
-| c1   | ASCON‑128       | gcs_ascon.py      |
-| c2   | Kyber Hybrid    | gcs_kyber_hybrid.py |
-| c3   | Dilithium       | gcs_dilithium.py  |
-| c4   | Falcon‑512      | gcs_falcon.py     |
-| c5   | Camellia‑CBC    | gcs_camellia.py   |
-| c6   | Speck‑CBC       | gcs_speck.py      |
-| c7   | HIGHT‑CBC       | gcs_hight.py      |
-| c8   | AES‑256‑GCM     | gcs_aes.py        |
+| Code | Algorithm         | Script          |
+|------|-------------------|-----------------|
+| c1   | ASCON‑128         | gcs_ascon.py    |
+| c2   | Speck‑CBC         | gcs_speck.py    |
+| c3   | Camellia‑CBC      | gcs_camellia.py |
+| c4   | HIGHT‑CBC         | gcs_hight.py    |
+| c5   | Dilithium         | gcs_dilithium.py|
+| c6   | Kyber (ML‑KEM‑768)| gcs_kyber.py    |
+| c7   | SPHINCS+          | gcs_sphincs.py  |
+| c8   | Falcon‑512        | gcs_falcon.py   |
 
 ## MQTT topics (used by GCS)
 

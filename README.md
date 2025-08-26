@@ -2,8 +2,8 @@
 
 A reproducible Ground Control Station (GCS) ↔ Drone crypto proxy stack supporting both post-quantum and classic algorithms. Implementations are available for all items below; most have end-to-end validation outputs included.
 
-- Status: 10 available; 9 validated locally in this README
-  - PQC: Kyber (hybrid KEM, ML-KEM-768), Dilithium (ML-DSA), Falcon, SPHINCS+
+- Status: 9 available; 9 validated locally in this README
+  - PQC: Kyber (ML-KEM-768), Dilithium (ML‑DSA), Falcon, SPHINCS+
   - Classic: AES‑GCM, ASCON‑128 (AEAD), Camellia‑CBC, HIGHT‑CBC, Speck‑CBC
 
 ## What’s in this repo
@@ -39,14 +39,14 @@ flowchart LR
   GCSProxy -- UDP plaintext (tlm) --> GCSApp
 ```
 
-### Kyber hybrid handshake (sequence)
+### Kyber (ML‑KEM‑768) handshake (sequence)
 
 ```mermaid
 sequenceDiagram
   participant GCS
   participant Drone
   Note over GCS,Drone: TCP key exchange on PORT_KEY_EXCHANGE
-  GCS->>GCS: Kyber generate_keypair()
+  GCS->>GCS: Kyber generate_keypair
   GCS->>Drone: send(Kyber public key)
   Drone->>Drone: encap_secret(pub) -> (ciphertext, shared_secret)
   Drone->>GCS: send(ciphertext)
@@ -88,18 +88,17 @@ Hosts: `GCS_HOST = 127.0.0.1`, `DRONE_HOST = 127.0.0.1` by default (see `ip_conf
 
 ## Algorithms implemented
 
-| Family | Mode/Variant | Key | Nonce/IV | Auth | Source |
-|---|---|---|---|---|---|
-| Kyber hybrid | KEM + AES‑GCM | derived 32B | 12B | AEAD | liboqs + cryptography |
-| Kyber (ML‑KEM‑768) | KEM + AES‑GCM | derived 32B | 12B | AEAD | liboqs + cryptography |
-| Dilithium (ML‑DSA) | Sign/Verify | n/a | n/a | Sign | liboqs |
-| Falcon | Sign/Verify | n/a | n/a | Sign | liboqs |
-| SPHINCS+ | Sign/Verify | n/a | n/a | Sign | liboqs |
-| ASCON‑128 | AEAD | 16B | 16B | AEAD | drneha.ascon |
-| AES | AES‑256‑GCM | 32B | 12B | AEAD | cryptography |
-| Camellia | CBC | 16/24/32B | 16B | No MAC | cryptography |
-| HIGHT | CBC | 16B MK | 8B | No MAC | drneha.hight |
-| Speck | CBC | 16B | 16B | No MAC | drneha Speck |
+| Family | Mode/Variant     | Key         | Nonce/IV | Auth | Source               |
+|--------|-------------------|-------------|----------|------|----------------------|
+| Kyber  | ML‑KEM‑768 + GCM  | derived 32B | 12B      | AEAD | liboqs + cryptography|
+| Dilithium | Sign/Verify   | n/a         | n/a      | Sign | liboqs               |
+| Falcon | Sign/Verify      | n/a         | n/a      | Sign | liboqs               |
+| SPHINCS+ | Sign/Verify    | n/a         | n/a      | Sign | liboqs               |
+| ASCON‑128 | AEAD          | 16B         | 16B      | AEAD | drneha.ascon         |
+| AES    | AES‑256‑GCM      | 32B         | 12B      | AEAD | cryptography         |
+| Camellia | CBC            | 16/24/32B   | 16B      | No MAC | cryptography       |
+| HIGHT  | CBC              | 16B MK      | 8B       | No MAC | drneha.hight       |
+| Speck  | CBC              | 16B         | 16B      | No MAC | drneha Speck       |
 
 Notes:
 - CBC modes (Camellia/HIGHT/Speck) provide confidentiality only; add HMAC for authenticity in production.
@@ -121,22 +120,16 @@ The following were executed in PowerShell on Windows using the repo as `sys.path
 KYBER (ML-KEM-768) g->d ok: True ; d->g ok: True
 ```
 
-### Kyber hybrid
+### Kyber (ML‑KEM‑768)
 ```
-[KYBER GCS] Starting Key Exchange...
-[KYBER GCS] Using liboqs Kyber1024
-[KYBER GCS] Waiting for Drone to connect for key exchange on 127.0.0.1:5800...
-[KYBER Drone] Starting Post-Quantum Key Exchange...
-[KYBER Drone] Using liboqs Kyber1024
-[KYBER Drone] Connected to GCS at 127.0.0.1:5800
-[KYBER GCS] Drone connected from ('127.0.0.1', 62832)
-[KYBER GCS] Public key sent.
-[KYBER Drone] Public key received.
-[KYBER Drone] Ciphertext sent.
-[KYBER GCS] Ciphertext received.
-✅ [KYBER Drone] Secure shared key established successfully!
-✅ [KYBER GCS] Secure shared key established successfully!
-KYBER hybrid g->d ok: True ; d->g ok: True
+[KYBER GCS] Starting Key Exchange (ML-KEM-768)...
+[KYBER GCS] Waiting on 127.0.0.1:5800...
+[KYBER Drone] Starting Key Exchange (ML-KEM-768)...
+[KYBER Drone] Connected to 127.0.0.1:5800
+[KYBER GCS] Drone connected from ('127.0.0.1', 57295)
+✅ [KYBER Drone] Shared key established
+✅ [KYBER GCS] Shared key established
+KYBER (ML-KEM-768) g->d ok: True ; d->g ok: True
 ```
 
 ### Dilithium (ML‑DSA)
@@ -233,20 +226,7 @@ python3 -m pip install --upgrade pip wheel
 pip3 install -r requirements.txt
 ```
 
-3) Start a pair (example: Kyber hybrid)
-
-- On GCS:
-```powershell
-python gcs\gcs_kyber_hybrid.py
-```
-- On Drone (Raspberry Pi 4B):
-```bash
-python3 drone/drone_kyber_hybrid.py
-```
-
-4) Swap algorithms by starting a different pair (`gcs_*.py` with matching `drone_*.py`).
-
-Example: ML‑KEM‑768 (normal Kyber)
+3) Start a pair (example: Kyber)
 
 - On GCS:
 ```powershell
@@ -256,6 +236,8 @@ python gcs\gcs_kyber.py
 ```bash
 python3 drone/drone_kyber.py
 ```
+
+4) Swap algorithms by starting a different pair (`gcs_*.py` with matching `drone_*.py`).
 
 ## Reproducibility and config
 
@@ -291,7 +273,6 @@ You can also run the portable harness `bench/benchmark.py` to time all algorithm
 python bench\benchmark.py --algo aes --iters 2000 --size 256
 python bench\benchmark.py --algo ascon --iters 2000 --size 256
 python bench\benchmark.py --algo kyber --iters 500 --size 128
-python bench\benchmark.py --algo kyber_hybrid --iters 500 --size 128
 python bench\benchmark.py --algo dilithium --iters 200 --size 128
 python bench\benchmark.py --algo falcon --iters 200 --size 128
 python bench\benchmark.py --algo sphincs --iters 50 --size 128
@@ -302,13 +283,13 @@ python bench\benchmark.py --algo sphincs --iters 50 --size 128
 python3 bench/benchmark.py --algo aes --iters 2000 --size 256
 python3 bench/benchmark.py --algo ascon --iters 2000 --size 256
 python3 bench/benchmark.py --algo kyber --iters 500 --size 128
-python3 bench/benchmark.py --algo kyber_hybrid --iters 500 --size 128
 python3 bench/benchmark.py --algo dilithium --iters 200 --size 128
 python3 bench/benchmark.py --algo falcon --iters 200 --size 128
 python3 bench/benchmark.py --algo sphincs --iters 50 --size 128
 ```
 
-Algorithms: `aes`, `ascon`, `camellia`, `hight`, `speck`, `kyber` (ML‑KEM‑768), `kyber_hybrid`, `dilithium`, `falcon`, `sphincs`.
+Algorithms: `aes`, `ascon`, `camellia`, `hight`, `speck`, `kyber` (ML‑KEM‑768), `dilithium`, `falcon`, `sphincs`.
+Algorithms (bench harness keys): `aes`, `ascon`, `camellia`, `hight`, `speck`, `kyber`, `dilithium`, `falcon`, `sphincs`.
 
 ## Raspberry Pi 4B notes
 
