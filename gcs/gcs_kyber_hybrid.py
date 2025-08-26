@@ -16,7 +16,7 @@
 # and the high performance of AES for the bulk data transfer.
 #
 # DEPENDENCIES:
-#   - oqs (pip install oqs)
+#   - liboqs-python (pip install liboqs-python)
 #   - cryptography (pip install cryptography)
 #   - ip_config.py
 # ==============================================================================
@@ -24,45 +24,104 @@
 import socket
 import threading
 import os
-import oqs
+import time
+try:
+    import oqs.oqs as oqs
+    USING_LIBOQS = True
+except ImportError:
+    print("[WARNING] liboqs not found, falling back to RSA key exchange")
+    from cryptography.hazmat.primitives.asymmetric import rsa, padding
+    from cryptography.hazmat.primitives import serialization, hashes
+    import hashlib
+    USING_LIBOQS = False
+
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from ip_config import *
 
 ## 1. POST-QUANTUM KEY EXCHANGE ##
 
-print("[KYBER GCS] Starting Post-Quantum Key Exchange...")
+print("[KYBER GCS] Starting Key Exchange...")
 
-# GCS generates a Kyber keypair.
-kem = oqs.KeyEncapsulation("Kyber1024")
-gcs_public_key = kem.generate_keypair()
+if USING_LIBOQS:
+    # Using actual Kyber implementation from liboqs
+    print("[KYBER GCS] Using liboqs Kyber1024")
+    
+    # GCS generates a Kyber keypair
+    kem = oqs.KeyEncapsulation("Kyber1024")
+    gcs_public_key = kem.generate_keypair()
+    
+    # Use TCP for reliable key exchange
+    exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
+    exchange_sock.listen(1)
+    print(f"[KYBER GCS] Waiting for Drone to connect for key exchange on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
+    conn, addr = exchange_sock.accept()
+    print(f"[KYBER GCS] Drone connected from {addr}")
+    
+    # Send the public key to the drone
+    conn.sendall(gcs_public_key)
+    print("[KYBER GCS] Public key sent.")
+    
+    # Receive the ciphertext from the drone
+    ciphertext = conn.recv(4096)
+    print("[KYBER GCS] Ciphertext received.")
+    
+    # Decapsulate to get the shared secret
+    shared_secret = kem.decap_secret(ciphertext)
+    
+    # The first 32 bytes will be our AES key
+    AES_KEY = shared_secret[:32]
+else:
+    # Fallback to RSA if liboqs not available
+    print("[KYBER GCS] Falling back to RSA key exchange")
+    
+    # Generate an RSA keypair as a fallback
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+    
+    # Serialize the public key to send to the drone
+    pem_public_key = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    
+    # Use TCP for reliable key exchange
+    exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
+    exchange_sock.listen(1)
+    print(f"[KYBER GCS] Waiting for Drone to connect for key exchange on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
+    conn, addr = exchange_sock.accept()
+    print(f"[KYBER GCS] Drone connected from {addr}")
+    
+    # Send the public key to the drone
+    conn.sendall(pem_public_key)
+    print("[KYBER GCS] Public key sent.")
+    
+    # Receive the encrypted shared secret from the drone
+    encrypted_shared_secret = conn.recv(4096)
+    print("[KYBER GCS] Encrypted shared secret received.")
+    
+    # Decrypt the shared secret
+    shared_secret = private_key.decrypt(
+        encrypted_shared_secret,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    
+    # Derive the AES key using SHA-256
+    AES_KEY = hashlib.sha256(shared_secret).digest()
 
-# Use a simple TCP socket for the one-time key exchange for reliability.
-# The server (GCS) waits for the client (Drone) to connect.
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
-exchange_sock.listen(1)
-print(f"[KYBER GCS] Waiting for Drone to connect for key exchange on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
-conn, addr = exchange_sock.accept()
-print(f"[KYBER GCS] Drone connected from {addr}")
-
-# Send the public key to the Drone.
-conn.sendall(gcs_public_key)
-print("[KYBER GCS] Public key sent.")
-
-# Receive the ciphertext from the Drone.
-ciphertext = conn.recv(4096)
-print("[KYBER GCS] Ciphertext received.")
-
-# Decapsulate the ciphertext to get the shared secret.
-shared_secret = kem.decap_secret(ciphertext)
-
-# The first 32 bytes of the shared secret will be our AES key.
-AES_KEY = shared_secret[:32]
+# Initialize AESGCM with the derived key
 aesgcm = AESGCM(AES_KEY)
 print("✅ [KYBER GCS] Secure shared key established successfully!")
 conn.close()
 exchange_sock.close()
-
 
 ## 2. SYMMETRIC CRYPTOGRAPHY FUNCTIONS (using the established key) ##
 

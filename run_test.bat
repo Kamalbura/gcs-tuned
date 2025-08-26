@@ -1,93 +1,98 @@
 @echo off
-REM ==============================================================================
-REM run_test.bat
-REM
-REM PURPOSE:
-REM   Automates the testing of the GCS/Drone cryptographic framework.
-REM   This script launches the necessary components in separate windows
-REM   to simulate the full communication pipeline.
-REM
-REM USAGE:
-REM   run_test.bat <crypto_code>
-REM
-REM   <crypto_code> is the code for the algorithm to test (e.g., c1, c2, ... c8).
-REM
-REM EXAMPLE:
-REM   To test Kyber+AES (c6):
-REM   > run_test.bat c6
-REM
-REM   To test Dilithium (c7):
-REM   > run_test.bat c7
-REM
-REM PRE-REQUISITES:
-REM   - Your conda environment 'gcs-env' must be activated or python must be in the path.
-REM   - Dependencies must be installed (pip install -r requirements.txt in gcs and drone folders).
-REM ==============================================================================
+setlocal enabledelayedexpansion
 
-SETLOCAL
+:: GCS/Drone Cryptographic Framework Test Script
+:: Usage: run_test.bat [crypto_code]
+::    e.g. run_test.bat c1  (for ASCON)
+::         run_test.bat c2  (for AES)
+::         run_test.bat c6  (for Kyber)
 
-IF [%1]==[] (
-    ECHO ERROR: No crypto code provided.
-    ECHO.
-    ECHO Usage: run_test.bat ^<crypto_code^>
-    ECHO   (e.g., run_test.bat c6)
-    GOTO :EOF
+echo === GCS/Drone Cryptographic Framework Test ===
+
+:: Validate input parameter
+if "%~1"=="" (
+  echo ERROR: Please specify a crypto code as parameter.
+  echo Usage: run_test.bat [c1-c8]
+  echo    c1 = ASCON
+  echo    c2 = AES
+  echo    c3 = Camellia
+  echo    c4 = SPECK
+  echo    c5 = HIGHT
+  echo    c6 = Kyber
+  echo    c7 = Dilithium
+  echo    c8 = Falcon
+  exit /b 1
 )
 
-SET CODE=%1
-ECHO.
-ECHO =================================================
-ECHO  GCS/DRONE FRAMEWORK TEST LAUNCHER
-ECHO =================================================
-ECHO.
-ECHO  Testing Algorithm Code: %CODE%
-ECHO.
+set CRYPTO_CODE=%~1
+set CRYPTO_NAME=Unknown
 
-REM --- Define the script paths ---
-SET GCS_DIR=%~dp0gcs
-SET DRONE_DIR=%~dp0drone
+:: Map crypto codes to names for better display
+if "%CRYPTO_CODE%"=="c1" set CRYPTO_NAME=ASCON
+if "%CRYPTO_CODE%"=="c2" set CRYPTO_NAME=AES
+if "%CRYPTO_CODE%"=="c3" set CRYPTO_NAME=Camellia
+if "%CRYPTO_CODE%"=="c4" set CRYPTO_NAME=SPECK
+if "%CRYPTO_CODE%"=="c5" set CRYPTO_NAME=HIGHT
+if "%CRYPTO_CODE%"=="c6" set CRYPTO_NAME=Kyber
+if "%CRYPTO_CODE%"=="c7" set CRYPTO_NAME=Dilithium
+if "%CRYPTO_CODE%"=="c8" set CRYPTO_NAME=Falcon
 
-REM --- Map codes to drone script names ---
-IF %CODE%==c1 SET DRONE_SCRIPT=drone_ascon.py
-IF %CODE%==c2 SET DRONE_SCRIPT=drone_aes.py
-IF %CODE%==c3 SET DRONE_SCRIPT=drone_camellia.py
-IF %CODE%==c4 SET DRONE_SCRIPT=drone_speck.py
-IF %CODE%==c5 SET DRONE_SCRIPT=drone_hight.py
-IF %CODE%==c6 SET DRONE_SCRIPT=drone_kyber_hybrid.py
-IF %CODE%==c7 SET DRONE_SCRIPT=drone_dilithium.py
-IF %CODE%==c8 SET DRONE_SCRIPT=drone_falcon.py
+:: Map crypto codes to script names
+if "%CRYPTO_CODE%"=="c1" set DRONE_SCRIPT=drone_ascon.py
+if "%CRYPTO_CODE%"=="c2" set DRONE_SCRIPT=drone_aes.py
+if "%CRYPTO_CODE%"=="c3" set DRONE_SCRIPT=drone_camellia.py
+if "%CRYPTO_CODE%"=="c4" set DRONE_SCRIPT=drone_speck.py
+if "%CRYPTO_CODE%"=="c5" set DRONE_SCRIPT=drone_hight.py
+if "%CRYPTO_CODE%"=="c6" set DRONE_SCRIPT=drone_kyber_hybrid.py
+if "%CRYPTO_CODE%"=="c7" set DRONE_SCRIPT=drone_dilithium.py
+if "%CRYPTO_CODE%"=="c8" set DRONE_SCRIPT=drone_falcon.py
 
-IF NOT DEFINED DRONE_SCRIPT (
-    ECHO ERROR: Invalid crypto code '%CODE%'. Please use c1 through c8.
-    GOTO :EOF
+:: Validate the crypto code
+if "%CRYPTO_NAME%"=="Unknown" (
+  echo ERROR: Invalid crypto code '%CRYPTO_CODE%'
+  echo Valid codes are: c1, c2, c3, c4, c5, c6, c7, c8
+  exit /b 1
 )
 
-ECHO  1. Starting Crypto Manager...
-START "Crypto Manager" cmd /c "cd /d %GCS_DIR% && python crypto_manager.py"
+echo Starting test for %CRYPTO_NAME% (%CRYPTO_CODE%)...
 
-ECHO  2. Starting Drone Proxy (%DRONE_SCRIPT%)...
-START "Drone Proxy" cmd /c "cd /d %DRONE_DIR% && python %DRONE_SCRIPT%"
+:: Check if conda environment is activated
+where python >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+  echo ERROR: Python not found in PATH.
+  echo Please activate your conda environment first:
+  echo   conda activate gcs-env
+  exit /b 1
+)
 
-ECHO.
-ECHO  Waiting 5 seconds for components to initialize...
-timeout /t 5 /nobreak > NUL
+:: First, start the crypto manager in a new window
+echo [1/3] Starting Crypto Manager...
+start "Crypto Manager" cmd /k "python gcs\crypto_manager.py"
 
-ECHO.
-ECHO  3. Sending command to GCS Controller to switch to %CODE%...
-cd /d %GCS_DIR%
-python gcs_controller.py switch %CODE%
+:: Wait a few seconds for the manager to initialize
+timeout /t 3 /nobreak > nul
 
-ECHO.
-ECHO =================================================
-ECHO  TESTING INSTRUCTIONS
-ECHO =================================================
-ECHO.
-ECHO - Two new windows have been opened: 'Crypto Manager' and 'Drone Proxy'.
-ECHO - The GCS proxy has been started via the manager.
-ECHO - Check the output in all three windows (this one, and the two new ones)
-ECHO   to verify that the components have connected and are running without errors.
-ECHO.
-ECHO - To end the test, simply close the two new command prompt windows.
-ECHO.
+:: Then start the drone proxy in another window
+echo [2/3] Starting Drone Proxy for %CRYPTO_NAME%...
+start "Drone Proxy - %CRYPTO_NAME%" cmd /k "python drone\%DRONE_SCRIPT%"
 
-ENDLOCAL
+:: Wait for the drone proxy to initialize
+echo Waiting for services to initialize...
+timeout /t 5 /nobreak > nul
+
+:: Finally, use the controller to switch to the matching GCS proxy
+echo [3/3] Connecting GCS to Drone using %CRYPTO_NAME%...
+python gcs\gcs_controller.py switch %CRYPTO_CODE%
+
+echo.
+echo === Test Running ===
+echo The test is now running with:
+echo   - Crypto Manager    (window title: Crypto Manager)
+echo   - %CRYPTO_NAME% Drone Proxy (window title: Drone Proxy - %CRYPTO_NAME%)
+echo   - %CRYPTO_NAME% GCS Proxy   (managed by Crypto Manager)
+echo.
+echo You can close this window. To stop the test, close the other windows
+echo or run: python gcs\gcs_controller.py stop
+echo.
+
+endlocal

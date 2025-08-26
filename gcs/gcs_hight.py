@@ -9,7 +9,7 @@
 # DEPENDENCIES:
 #   - pycryptodome (for padding)
 #   - ip_config.py
-#   - hight.py, hight_CBC.py (Your implementations)
+#   - hight.py, hight_CBC.py (Your implementations in the same folder)
 # ==============================================================================
 
 import socket
@@ -21,7 +21,7 @@ from ip_config import *
 
 ## 1. CONFIGURATION ##
 PSK_HIGHT_MK = [0x88, 0xE3, 0x4F, 0x8F, 0x08, 0x17, 0x79, 0xF1, 0xE9, 0xF3, 0x94, 0x37, 0x0A, 0xD4, 0x05, 0x89]
-BLOCK_SIZE = 8 # HIGHT has a 64-bit (8-byte) block size
+BLOCK_SIZE = 8  # HIGHT has a 64-bit (8-byte) block size
 
 ## 2. CRYPTOGRAPHY FUNCTIONS ##
 def encrypt_message(plaintext):

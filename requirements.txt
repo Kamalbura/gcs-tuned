@@ -1,0 +1,18 @@
+# Final, corrected requirements for the UAV Secure Framework.
+# The conflicting 'oqs' (Open Quick Script) package is NOT included.
+
+# This is the correct, official Python wrapper for the liboqs C library.
+# It provides all PQC algorithms (Kyber, Dilithium, Falcon, etc.).
+liboqs-python
+
+# Industry-standard library for AES-GCM and the backend for our custom Camellia class.
+cryptography
+
+# Versatile library used for ASCON implementation and padding utilities.
+pycryptodome
+
+# Standard library for MAVLink communication.
+pymavlink
+
+# Standard library for MQTT communication.
+paho-mqtt

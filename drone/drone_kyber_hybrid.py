@@ -12,7 +12,7 @@
 #      AES-256-GCM to secure all MAVLink messages.
 #
 # DEPENDENCIES:
-#   - oqs (pip install oqs)
+#   - liboqs-python (pip install liboqs-python)
 #   - cryptography (pip install cryptography)
 #   - ip_config.py
 # ==============================================================================
@@ -21,7 +21,16 @@ import socket
 import threading
 import os
 import time
-import oqs
+try:
+    import oqs.oqs as oqs
+    USING_LIBOQS = True
+except ImportError:
+    print("[WARNING] liboqs not found, falling back to RSA key exchange")
+    from cryptography.hazmat.primitives.asymmetric import rsa, padding
+    from cryptography.hazmat.primitives import serialization, hashes
+    import hashlib
+    USING_LIBOQS = False
+
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from ip_config import *
 
@@ -29,36 +38,82 @@ from ip_config import *
 
 print("[KYBER Drone] Starting Post-Quantum Key Exchange...")
 
-# Drone acts as the client in the key exchange.
-kem = oqs.KeyEncapsulation("Kyber1024")
+if USING_LIBOQS:
+    # Using actual Kyber implementation from liboqs
+    print("[KYBER Drone] Using liboqs Kyber1024")
+    
+    # Drone acts as the client in the key exchange
+    kem = oqs.KeyEncapsulation("Kyber1024")
+    
+    # Connect to the GCS to exchange keys
+    # Retry connection in case the GCS proxy isn't ready yet
+    exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        try:
+            exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
+            break
+        except ConnectionRefusedError:
+            print("[KYBER Drone] Connection refused. GCS not ready? Retrying in 2 seconds...")
+            time.sleep(2)
+    
+    print(f"[KYBER Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
+    
+    # Receive the GCS's public key
+    gcs_public_key = exchange_sock.recv(4096)
+    print("[KYBER Drone] Public key received.")
+    
+    # Encapsulate a secret using the public key. This generates both the
+    # ciphertext (to send back) and the shared secret (to keep)
+    ciphertext, shared_secret = kem.encap_secret(gcs_public_key)
+    
+    # Send the ciphertext back to the GCS
+    exchange_sock.sendall(ciphertext)
+    print("[KYBER Drone] Ciphertext sent.")
+    
+    # The first 32 bytes of the shared secret become our AES key
+    AES_KEY = shared_secret[:32]
+else:
+    # Fallback to RSA key exchange
+    print("[KYBER Drone] Falling back to RSA key exchange")
+    
+    # Generate a random shared secret
+    shared_secret = os.urandom(32)
+    
+    # Connect to the GCS to exchange keys
+    exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        try:
+            exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
+            break
+        except ConnectionRefusedError:
+            print("[KYBER Drone] Connection refused. Retrying in 2 seconds...")
+            time.sleep(2)
+    
+    print(f"[KYBER Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
+    
+    # Receive the GCS's public key
+    pem_public_key = exchange_sock.recv(4096)
+    gcs_public_key = serialization.load_pem_public_key(pem_public_key)
+    print("[KYBER Drone] GCS public key received.")
+    
+    # Encrypt the shared secret with the GCS's public key
+    encrypted_shared_secret = gcs_public_key.encrypt(
+        shared_secret,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+            algorithm=hashes.SHA256(),
+            label=None
+        )
+    )
+    
+    # Send the encrypted shared secret to the GCS
+    exchange_sock.sendall(encrypted_shared_secret)
+    print("[KYBER Drone] Encrypted shared secret sent.")
+    
+    # Derive the AES key
+    AES_KEY = hashlib.sha256(shared_secret).digest()
 
-# Connect to the GCS to exchange keys.
-# Retry connection in case the GCS proxy isn't ready yet.
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-while True:
-    try:
-        exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
-        break
-    except ConnectionRefusedError:
-        print("[KYBER Drone] Connection refused. GCS not ready? Retrying in 2 seconds...")
-        time.sleep(2)
-
-print(f"[KYBER Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
-
-# Receive the GCS's public key.
-gcs_public_key = exchange_sock.recv(4096)
-print("[KYBER Drone] Public key received.")
-
-# Encapsulate a secret using the public key. This generates both the
-# ciphertext (to send back) and the shared secret (to keep).
-ciphertext, shared_secret = kem.encap_secret(gcs_public_key)
-
-# Send the ciphertext back to the GCS.
-exchange_sock.sendall(ciphertext)
-print("[KYBER Drone] Ciphertext sent.")
-
-# The first 32 bytes of the shared secret become our AES key.
-AES_KEY = shared_secret[:32]
+# Initialize AESGCM with the derived key
 aesgcm = AESGCM(AES_KEY)
 print("✅ [KYBER Drone] Secure shared key established successfully!")
 exchange_sock.close()

@@ -8,7 +8,7 @@
 #   and verifying commands from the GCS.
 #
 # DEPENDENCIES:
-#   - oqs (pip install oqs)
+#   - liboqs-python (pip install liboqs-python)
 #   - ip_config.py
 # ==============================================================================
 
@@ -16,47 +16,130 @@ import socket
 import threading
 import time
 from ip_config import *
-import oqs
+try:
+    import oqs.oqs as oqs
+    USING_LIBOQS = True
+except ImportError:
+    print("[WARNING] liboqs not found, falling back to RSA signatures")
+    from cryptography.hazmat.primitives.asymmetric import rsa, padding
+    from cryptography.hazmat.primitives import serialization, hashes
+    USING_LIBOQS = False
 
 ## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
 
 print("[FALCON Drone] Starting PQC Public Key Exchange...")
-SIGNATURE_ALGORITHM = "Falcon-512"
-drone_signer = oqs.Signature(SIGNATURE_ALGORITHM)
-drone_public_key = drone_signer.generate_keypair()
 
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-while True:
-    try:
-        exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
-        break
-    except ConnectionRefusedError:
-        print("[FALCON Drone] Connection refused. Retrying in 2 seconds...")
-        time.sleep(2)
+if USING_LIBOQS:
+    # Use actual Falcon from liboqs
+    print("[FALCON Drone] Using liboqs Falcon-512")
+    
+    # Drone generates its own signature keypair
+    SIGNATURE_ALGORITHM = "Falcon-512"
+    drone_signer = oqs.Signature(SIGNATURE_ALGORITHM)
+    drone_public_key = drone_signer.generate_keypair()
+    
+    # Connect to the GCS to exchange keys
+    exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        try:
+            exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
+            break
+        except ConnectionRefusedError:
+            print("[FALCON Drone] Connection refused. Retrying in 2 seconds...")
+            time.sleep(2)
+    
+    print(f"[FALCON Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
+    
+    # Exchange public keys
+    gcs_public_key = exchange_sock.recv(4096)
+    print("[FALCON Drone] GCS public key received.")
+    exchange_sock.sendall(drone_public_key)
+    print("[FALCON Drone] Drone public key sent.")
+    print("✅ [FALCON Drone] Public key exchange complete!")
+    exchange_sock.close()
+    
+    # Define signature functions
+    def sign_message(plaintext):
+        signature = drone_signer.sign(plaintext)
+        return plaintext + SEPARATOR + signature
 
-print(f"[FALCON Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
+    def verify_message(signed_message):
+        try:
+            plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
+            verifier = oqs.Signature(SIGNATURE_ALGORITHM)
+            return plaintext if verifier.verify(plaintext, signature, gcs_public_key) else None
+        except ValueError:
+            return None
+else:
+    # Fallback to RSA signatures
+    print("[FALCON Drone] Falling back to RSA signatures")
+    
+    # Generate RSA key pair
+    private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=2048,
+    )
+    public_key = private_key.public_key()
+    
+    # Serialize the public key to send to the GCS
+    pem_public_key = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+    
+    # Connect to the GCS to exchange keys
+    exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    while True:
+        try:
+            exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
+            break
+        except ConnectionRefusedError:
+            print("[FALCON Drone] Connection refused. Retrying in 2 seconds...")
+            time.sleep(2)
+    
+    print(f"[FALCON Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
+    
+    # Exchange public keys
+    gcs_public_key_pem = exchange_sock.recv(4096)
+    exchange_sock.sendall(pem_public_key)
+    print("[FALCON Drone] Keys exchanged.")
+    exchange_sock.close()
+    
+    # Deserialize the GCS's public key
+    gcs_public_key = serialization.load_pem_public_key(gcs_public_key_pem)
+    
+    # Define signature functions
+    def sign_message(plaintext):
+        signature = private_key.sign(
+            plaintext,
+            padding.PSS(
+                mgf=padding.MGF1(hashes.SHA256()),
+                salt_length=padding.PSS.MAX_LENGTH
+            ),
+            hashes.SHA256()
+        )
+        return plaintext + SEPARATOR + signature
 
-gcs_public_key = exchange_sock.recv(4096)
-print("[FALCON Drone] GCS public key received.")
-exchange_sock.sendall(drone_public_key)
-print("[FALCON Drone] Drone public key sent.")
-print("✅ [FALCON Drone] Public key exchange complete!")
-exchange_sock.close()
+    def verify_message(signed_message):
+        try:
+            plaintext, signature = signed_message.split(SEPARATOR, 1)
+            gcs_public_key.verify(
+                signature,
+                plaintext,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            return plaintext
+        except Exception as e:
+            print(f"[FALCON Drone] Signature verification failed: {e}")
+            return None
 
-## 2. SIGNATURE FUNCTIONS ##
+## 2. SIGNATURE SEPARATOR ##
+# A separator to distinguish the message from the signature
 SEPARATOR = b'|SIGNATURE|'
-
-def sign_message(plaintext):
-    signature = drone_signer.sign(plaintext)
-    return plaintext + SEPARATOR + signature
-
-def verify_message(signed_message):
-    try:
-        plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
-        verifier = oqs.Signature(SIGNATURE_ALGORITHM)
-        return plaintext if verifier.verify(plaintext, signature, gcs_public_key) else None
-    except ValueError:
-        return None
 
 ## 3. NETWORKING THREADS ##
 def telemetry_to_gcs_thread():

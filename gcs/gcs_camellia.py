@@ -5,8 +5,7 @@
 #
 # PURPOSE:
 #   Implements the GCS-side logic for Camellia encryption. It uses the
-#   CustomCamelliaCipher class from your previous work, which is an excellent
-#   way to leverage the `cryptography` library's backend.
+#   CustomCamelliaCipher class based on the cryptography library's backend.
 #
 # SECURITY WARNING:
 #   This implementation uses CBC mode, which provides confidentiality but NOT
@@ -17,7 +16,6 @@
 # DEPENDENCIES:
 #   - cryptography (pip install cryptography)
 #   - ip_config.py
-#   - camellia.py (Your custom implementation)
 # ==============================================================================
 
 import socket
@@ -104,5 +102,7 @@ if __name__ == "__main__":
     t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
     t1.start()
     t2.start()
+    t1.join()
+    t2.join()
     t1.join()
     t2.join()

@@ -5,7 +5,7 @@
 #
 # PURPOSE:
 #   Implements the GCS-side logic for SPECK encryption. It relies on your
-#   custom `speck.py` module.
+#   custom `custom_speck.py` module.
 #
 # SECURITY WARNING:
 #   Like the Camellia example, this uses CBC mode which lacks authenticity.
@@ -14,14 +14,14 @@
 # DEPENDENCIES:
 #   - pycryptodome (for padding)
 #   - ip_config.py
-#   - speck.py (Your custom implementation must be in the same folder)
+#   - custom_speck.py (Your custom implementation must be in the same folder)
 # ==============================================================================
 
 import socket
 import threading
 import os
 from Crypto.Util.Padding import pad, unpad
-from speck import Python_SPECK # Assuming your class is named Python_SPECK
+from custom_speck import Python_SPECK  # Changed import from speck to custom_speck
 from ip_config import *
 
 ## 1. CONFIGURATION ##

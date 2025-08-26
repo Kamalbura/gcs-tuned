@@ -23,7 +23,7 @@
 import socket
 import threading
 import os
-from Crypto.Cipher import ASCON
+from Cryptodome.Cipher import ASCON
 from ip_config import *
 
 ## 1. CONFIGURATION ##

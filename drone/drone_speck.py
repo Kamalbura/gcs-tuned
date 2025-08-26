@@ -18,8 +18,8 @@
 import socket
 import threading
 import os
-from Crypto.Util.Padding import pad, unpad
-from speck import Python_SPECK
+from Cryptodome.Util.Padding import pad, unpad
+from custom_speck import Python_SPECK
 from ip_config import *
 
 ## 1. CONFIGURATION ##
