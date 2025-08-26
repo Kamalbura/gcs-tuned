@@ -1,8 +1,8 @@
 # GCS–Drone Crypto Proxies (Post-Quantum + Classic)
 
-A reproducible Ground Control Station (GCS) ↔ Drone crypto proxy stack supporting both post-quantum and classic algorithms. All implementations below have been validated end-to-end on localhost with the outputs provided.
+A reproducible Ground Control Station (GCS) ↔ Drone crypto proxy stack supporting both post-quantum and classic algorithms. Implementations are available for all items below; most have end-to-end validation outputs included.
 
-- Status: 9/9 working
+- Status: 10 available; 9 validated locally in this README
   - PQC: Kyber (hybrid KEM, ML-KEM-768), Dilithium (ML-DSA), Falcon, SPHINCS+
   - Classic: AES‑GCM, ASCON‑128 (AEAD), Camellia‑CBC, HIGHT‑CBC, Speck‑CBC
 
@@ -11,7 +11,11 @@ A reproducible Ground Control Station (GCS) ↔ Drone crypto proxy stack support
 - `gcs/` and `drone/`: Proxy scripts per algorithm
 - `ip_config.py`: Central ports and hosts (plus scoped copies in `gcs/` and `drone/`)
 - `requirements.txt`: Python dependencies
-- `drneha/`: High-quality reference implementations (ASCON, Camellia, HIGHT, Speck)
+- `gcs/drneha/` and `drone/drneha/`: Reference implementations (ASCON, Camellia, HIGHT, Speck)
+
+See also the scheduler guides:
+- GCS Orchestration: `gcs/README.md`
+- Drone Schedulers: `drone/README.md`
 
 ## Quick architecture
 
@@ -233,7 +237,7 @@ pip3 install -r requirements.txt
 
 - On GCS:
 ```powershell
-python gcs\\gcs_kyber_hybrid.py
+python gcs\gcs_kyber_hybrid.py
 ```
 - On Drone (Raspberry Pi 4B):
 ```bash
