@@ -1,3 +1,4 @@
 liboqs-python>=0.7.2
 cryptography
 pycryptodome
+paho-mqtt>=1.6.0

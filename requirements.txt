@@ -15,4 +15,4 @@ pycryptodome
 pymavlink
 
 # Standard library for MQTT communication.
-paho-mqtt
+paho-mqtt>=1.6.0

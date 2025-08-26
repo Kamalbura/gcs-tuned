@@ -1,9 +1,9 @@
 # GCS–Drone Crypto Proxies (Post-Quantum + Classic)
 
-A reproducible Ground Control Station (GCS) ↔ Drone crypto proxy stack supporting both post-quantum and classic algorithms. All 8/8 implementations have been validated end-to-end on localhost with the outputs below.
+A reproducible Ground Control Station (GCS) ↔ Drone crypto proxy stack supporting both post-quantum and classic algorithms. All implementations below have been validated end-to-end on localhost with the outputs provided.
 
-- Status: 8/8 working
-  - PQC: Kyber (hybrid KEM), Dilithium (ML-DSA), Falcon, SPHINCS+
+- Status: 9/9 working
+  - PQC: Kyber (hybrid KEM, ML-KEM-768), Dilithium (ML-DSA), Falcon, SPHINCS+
   - Classic: AES‑GCM, ASCON‑128 (AEAD), Camellia‑CBC, HIGHT‑CBC, Speck‑CBC
 
 ## What’s in this repo
@@ -21,7 +21,7 @@ flowchart LR
     GCSApp[GCS App]
     GCSProxy{{GCS Crypto Proxy}}
   end
-  subgraph Drone Host (Companion)
+  subgraph Drone Host
     Flight[Flight Controller]
     DroneProxy{{Drone Crypto Proxy}}
   end
@@ -47,7 +47,7 @@ sequenceDiagram
   Drone->>Drone: encap_secret(pub) -> (ciphertext, shared_secret)
   Drone->>GCS: send(ciphertext)
   GCS->>GCS: decap_secret(ciphertext) -> shared_secret
-  Note over GCS,Drone: Derive AES-256-GCM key from shared_secret; switch to UDP
+  Note over GCS,Drone: Derive AES-256-GCM key from shared_secret, then switch to UDP
 ```
 
 ### Signature flow (Dilithium/Falcon/SPHINCS+)
@@ -56,12 +56,13 @@ sequenceDiagram
 sequenceDiagram
   participant GCS
   participant Drone
+  participant Flight
   Note over GCS,Drone: TCP exchange of public keys (one-time)
   GCS->>GCS: sign(plaintext) -> signature
   GCS->>Drone: UDP send plaintext||SEPARATOR||signature
   Drone->>Drone: verify(plaintext, signature, gcs_pub)
   alt valid
-    Drone->>FC: forward plaintext
+    Drone->>Flight: forward plaintext
   else invalid
     Drone->>Drone: drop + log
   end
@@ -86,6 +87,7 @@ Hosts: `GCS_HOST = 127.0.0.1`, `DRONE_HOST = 127.0.0.1` by default (see `ip_conf
 | Family | Mode/Variant | Key | Nonce/IV | Auth | Source |
 |---|---|---|---|---|---|
 | Kyber hybrid | KEM + AES‑GCM | derived 32B | 12B | AEAD | liboqs + cryptography |
+| Kyber (ML‑KEM‑768) | KEM + AES‑GCM | derived 32B | 12B | AEAD | liboqs + cryptography |
 | Dilithium (ML‑DSA) | Sign/Verify | n/a | n/a | Sign | liboqs |
 | Falcon | Sign/Verify | n/a | n/a | Sign | liboqs |
 | SPHINCS+ | Sign/Verify | n/a | n/a | Sign | liboqs |
@@ -102,6 +104,18 @@ Notes:
 ## Verified outputs (local tests)
 
 The following were executed in PowerShell on Windows using the repo as `sys.path`. Each pair initialized in-process and performed round-trips.
+
+### Kyber (ML‑KEM‑768)
+```
+[KYBER GCS] Starting Key Exchange (ML-KEM-768)...
+[KYBER GCS] Waiting on 127.0.0.1:5800...
+[KYBER Drone] Starting Key Exchange (ML-KEM-768)...
+[KYBER Drone] Connected to 127.0.0.1:5800
+[KYBER GCS] Drone connected from ('127.0.0.1', 57295)
+✅ [KYBER Drone] Shared key established
+✅ [KYBER GCS] Shared key established
+KYBER (ML-KEM-768) g->d ok: True ; d->g ok: True
+```
 
 ### Kyber hybrid
 ```
@@ -228,6 +242,17 @@ python3 drone/drone_kyber_hybrid.py
 
 4) Swap algorithms by starting a different pair (`gcs_*.py` with matching `drone_*.py`).
 
+Example: ML‑KEM‑768 (normal Kyber)
+
+- On GCS:
+```powershell
+python gcs\gcs_kyber.py
+```
+- On Drone (Raspberry Pi 4B):
+```bash
+python3 drone/drone_kyber.py
+```
+
 ## Reproducibility and config
 
 - Both `gcs/` and `drone/` contain an `ip_config.py` copy scoped for that subpackage; there is also a root `ip_config.py`. Keep them consistent or centralize imports as preferred. Ports and hosts are documented in this README.
@@ -252,6 +277,34 @@ print(f"ASCON decrypt avg: {(end-start)/N*1e6:.1f} us")
 ```
 
 For signature schemes, wrap the `verify_message()` call similarly. On Raspberry Pi 4B, ensure the device is in performance governor for consistent timing.
+
+### Benchmark harness (portable)
+
+You can also run the portable harness `bench/benchmark.py` to time all algorithms consistently on Windows or Raspberry Pi:
+
+```powershell
+# Windows PowerShell examples
+python bench\benchmark.py --algo aes --iters 2000 --size 256
+python bench\benchmark.py --algo ascon --iters 2000 --size 256
+python bench\benchmark.py --algo kyber --iters 500 --size 128
+python bench\benchmark.py --algo kyber_hybrid --iters 500 --size 128
+python bench\benchmark.py --algo dilithium --iters 200 --size 128
+python bench\benchmark.py --algo falcon --iters 200 --size 128
+python bench\benchmark.py --algo sphincs --iters 50 --size 128
+```
+
+```bash
+# Raspberry Pi examples
+python3 bench/benchmark.py --algo aes --iters 2000 --size 256
+python3 bench/benchmark.py --algo ascon --iters 2000 --size 256
+python3 bench/benchmark.py --algo kyber --iters 500 --size 128
+python3 bench/benchmark.py --algo kyber_hybrid --iters 500 --size 128
+python3 bench/benchmark.py --algo dilithium --iters 200 --size 128
+python3 bench/benchmark.py --algo falcon --iters 200 --size 128
+python3 bench/benchmark.py --algo sphincs --iters 50 --size 128
+```
+
+Algorithms: `aes`, `ascon`, `camellia`, `hight`, `speck`, `kyber` (ML‑KEM‑768), `kyber_hybrid`, `dilithium`, `falcon`, `sphincs`.
 
 ## Raspberry Pi 4B notes
 
