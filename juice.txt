@@ -1,2248 +1,2248 @@
-Of course. I understand completely. You want to move from a collection of scripts to a standardized, robust, and well-documented framework that you can build upon. I will provide exactly that.
+# #Of course. I understand completely. You want to move from a collection of scripts to a standardized, robust, and well-documented framework that you can build upon. I will provide exactly that.
 
-Based on the high quality of your existing work, I have created a complete, professional-grade framework for you. This framework is designed for clarity, security, and modularity.
+# Based on the high quality of your existing work, I have created a complete, professional-grade framework for you. This framework is designed for clarity, security, and modularity.
 
-The Framework Philosophy
+# The Framework Philosophy
 
-Standardization: Every GCS proxy and Drone proxy works the exact same way. They listen on the same ports and have the same structure, making them interchangeable.
+# Standardization: Every GCS proxy and Drone proxy works the exact same way. They listen on the same ports and have the same structure, making them interchangeable.
 
-Centralized Configuration: All IP addresses and ports are managed in a single ip_config.py file. You will only need to edit this one file to switch from local testing to a real network.
+# Centralized Configuration: All IP addresses and ports are managed in a single ip_config.py file. You will only need to edit this one file to switch from local testing to a real network.
 
-Security Best Practices:
+# Security Best Practices:
 
-For ciphers that require it (like AES, Camellia), a random, per-message nonce/IV is generated and prepended to the ciphertext. This is a critical security practice that prevents catastrophic cryptographic failures.
+# For ciphers that require it (like AES, Camellia), a random, per-message nonce/IV is generated and prepended to the ciphertext. This is a critical security practice that prevents catastrophic cryptographic failures.
 
-For Post-Quantum algorithms, we will use a hybrid cryptography approach, which is the industry standard:
+# For Post-Quantum algorithms, we will use a hybrid cryptography approach, which is the industry standard:
 
-Kyber (KEM): Used to securely establish a shared secret key for a fast symmetric cipher like AES.
+# Kyber (KEM): Used to securely establish a shared secret key for a fast symmetric cipher like AES.
 
-Dilithium/Falcon (Signatures): Used to provide authenticity and integrity by signing every message, preventing tampering.
+# Dilithium/Falcon (Signatures): Used to provide authenticity and integrity by signing every message, preventing tampering.
 
-Crystal Clear Documentation: Every single script is heavily commented to explain not just what the code is doing, but why it is designed that way.
+# Crystal Clear Documentation: Every single script is heavily commented to explain not just what the code is doing, but why it is designed that way.
 
-Step 1: Your Dependencies
+# Step 1: Your Dependencies
 
-First, ensure your (gcs-env) has all the necessary packages installed.
+# First, ensure your (gcs-env) has all the necessary packages installed.
 
-code
-Shell
-download
-content_copy
-expand_less
+# code
+# Shell
+# download
+# content_copy
+# expand_less
 
-# Activate your environment
-conda activate gcs-env
+# # Activate your environment
+# conda activate gcs-env
 
-# Install the required packages
-pip install oqs cryptography pycryptodome
-Step 2: The Central Configuration File
+# # Install the required packages
+# pip install oqs cryptography pycryptodome
+# Step 2: The Central Configuration File
 
-This is the heart of your framework. All other scripts will import their network settings from here. Initially, all IPs are set to 127.0.0.1 for easy testing on a single machine.
+# This is the heart of your framework. All other scripts will import their network settings from here. Initially, all IPs are set to 127.0.0.1 for easy testing on a single machine.
 
-ip_config.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
 # ip_config.py
-#
-# PURPOSE:
-#   Centralized IP and Port Configuration for the GCS and Drone framework.
-#   Edit ONLY this file to change network addresses. All other scripts
-#   import their settings from here for consistency.
-#
-# INITIAL SETUP:
-#   All hosts are set to "127.0.0.1" (localhost) for easy testing of all
-#   components on a single machine.
-#
-# DEPLOYMENT:
-#   When deploying to a real network, change GCS_HOST and DRONE_HOST to the
-#   actual IP addresses of your machines.
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # ip_config.py
+# #
+# # PURPOSE:
+# #   Centralized IP and Port Configuration for the GCS and Drone framework.
+# #   Edit ONLY this file to change network addresses. All other scripts
+# #   import their settings from here for consistency.
+# #
+# # INITIAL SETUP:
+# #   All hosts are set to "127.0.0.1" (localhost) for easy testing of all
+# #   components on a single machine.
+# #
+# # DEPLOYMENT:
+# #   When deploying to a real network, change GCS_HOST and DRONE_HOST to the
+# #   actual IP addresses of your machines.
+# # ==============================================================================
+
+# # --- HOST ADDRESSES ---
+# # Change these when you move from local testing to a real network.
+# GCS_HOST = "127.0.0.1"    # The primary IP address of the GCS machine.
+# DRONE_HOST = "127.0.0.1"  # The primary IP address of the Drone machine.
+
+# # --- NETWORK PORTS ---
+# # A new, clean set of ports to avoid conflicts with old scripts.
+
+# # Port for PQC Key Exchange (Kyber public keys, signatures, etc.)
+# PORT_KEY_EXCHANGE = 5800
+
+# # Ports for MAVLink Command Flow (GCS App -> Drone)
+# # 1. GCS App sends plaintext MAVLink to this local port.
+# PORT_GCS_LISTEN_PLAINTEXT_CMD = 5810
+# # 2. Drone's crypto proxy listens for encrypted commands on this port.
+# PORT_DRONE_LISTEN_ENCRYPTED_CMD = 5811
+# # 3. Drone's crypto proxy forwards decrypted commands to the flight controller on this local port.
+# PORT_DRONE_FORWARD_DECRYPTED_CMD = 5812
+
+# # Ports for MAVLink Telemetry Flow (Drone -> GCS App)
+# # 1. Drone's flight controller sends plaintext MAVLink to this local port.
+# PORT_DRONE_LISTEN_PLAINTEXT_TLM = 5820
+# # 2. GCS crypto proxy listens for encrypted telemetry on this port.
+# PORT_GCS_LISTEN_ENCRYPTED_TLM = 5821
+# # 3. GCS crypto proxy forwards decrypted telemetry to the GCS application on this local port.
+# PORT_GCS_FORWARD_DECRYPTED_TLM = 5822
+
+# # --- CRYPTOGRAPHY CONSTANTS ---
+# # Standard size for Nonce/IV in bytes for AES-GCM, ASCON, and CBC modes.
+# NONCE_IV_SIZE = 12
+# Step 3: The 16 Crystal Clear Scripts
+
+# Here are the 8 pairs of GCS (server) and Drone (client) scripts. They are designed to be run by your Cryptography Manager.
+
+# 1. ASCON-128 (Lightweight AEAD Cipher)
+
+# Method: Symmetric encryption using a Pre-Shared Key (PSK). AEAD provides both confidentiality and authenticity.
+
+# Security Note: Uses a random nonce for every message to ensure security.
+
+# gcs_ascon.py```python
+
 # ==============================================================================
-
-# --- HOST ADDRESSES ---
-# Change these when you move from local testing to a real network.
-GCS_HOST = "127.0.0.1"    # The primary IP address of the GCS machine.
-DRONE_HOST = "127.0.0.1"  # The primary IP address of the Drone machine.
-
-# --- NETWORK PORTS ---
-# A new, clean set of ports to avoid conflicts with old scripts.
-
-# Port for PQC Key Exchange (Kyber public keys, signatures, etc.)
-PORT_KEY_EXCHANGE = 5800
-
-# Ports for MAVLink Command Flow (GCS App -> Drone)
-# 1. GCS App sends plaintext MAVLink to this local port.
-PORT_GCS_LISTEN_PLAINTEXT_CMD = 5810
-# 2. Drone's crypto proxy listens for encrypted commands on this port.
-PORT_DRONE_LISTEN_ENCRYPTED_CMD = 5811
-# 3. Drone's crypto proxy forwards decrypted commands to the flight controller on this local port.
-PORT_DRONE_FORWARD_DECRYPTED_CMD = 5812
-
-# Ports for MAVLink Telemetry Flow (Drone -> GCS App)
-# 1. Drone's flight controller sends plaintext MAVLink to this local port.
-PORT_DRONE_LISTEN_PLAINTEXT_TLM = 5820
-# 2. GCS crypto proxy listens for encrypted telemetry on this port.
-PORT_GCS_LISTEN_ENCRYPTED_TLM = 5821
-# 3. GCS crypto proxy forwards decrypted telemetry to the GCS application on this local port.
-PORT_GCS_FORWARD_DECRYPTED_TLM = 5822
-
-# --- CRYPTOGRAPHY CONSTANTS ---
-# Standard size for Nonce/IV in bytes for AES-GCM, ASCON, and CBC modes.
-NONCE_IV_SIZE = 12
-Step 3: The 16 Crystal Clear Scripts
-
-Here are the 8 pairs of GCS (server) and Drone (client) scripts. They are designed to be run by your Cryptography Manager.
-
-1. ASCON-128 (Lightweight AEAD Cipher)
-
-Method: Symmetric encryption using a Pre-Shared Key (PSK). AEAD provides both confidentiality and authenticity.
-
-Security Note: Uses a random nonce for every message to ensure security.
-
-gcs_ascon.py```python
-
-==============================================================================
-gcs_ascon.py
-GCS-Side Proxy for ASCON-128 Cryptography
-PURPOSE:
-- Listens for encrypted telemetry from the Drone.
-- Decrypts it using ASCON-128.
-- Forwards the plaintext MAVLink telemetry to the local GCS application.
-- Listens for plaintext MAVLink commands from the local GCS application.
-- Encrypts them using ASCON-128.
-- Sends the encrypted commands to the Drone.
-DEPENDENCIES:
-- pycryptodome (pip install pycryptodome)
-- ip_config.py (must be in the same directory or Python path)
-HOW TO RUN:
-This script is intended to be started by a manager process.
-To run standalone for testing: python gcs_ascon.py
-==============================================================================
-
-import socket
-import threading
-import os
-from Crypto.Cipher import ASCON
-from ip_config import *
-
-1. CONFIGURATION
-SECURITY WARNING: This is a pre-shared key (PSK). In a real-world system,
-this key should be generated dynamically and exchanged securely, for example,
-using a Post-Quantum Key Encapsulation Mechanism (KEM) like Kyber.
-For this example, we use a static key for simplicity.
-Key must be 16 bytes for ASCON-128.
-
-PSK_ASCON = b'ThisIsA_16ByteKey'
-
-2. CRYPTOGRAPHY FUNCTIONS
-
-def encrypt_message(plaintext):
-"""
-Encrypts a plaintext message using ASCON-128.
-A new random nonce is generated for each message for security.
-The nonce is prepended to the ciphertext.
-[nonce (16 bytes)] + [ciphertext + tag]
-"""
-nonce = os.urandom(16) # ASCON uses a 16-byte nonce
-cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
-ciphertext, tag = cipher.encrypt_and_digest(plaintext)
-return nonce + ciphertext + tag
-
-def decrypt_message(encrypted_message):
-"""
-Decrypts an incoming message using ASCON-128.
-Splits the nonce from the message, then decrypts and verifies.
-Returns the plaintext or None if verification fails.
-"""
-try:
-nonce = encrypted_message[:16]
-ciphertext_with_tag = encrypted_message[16:]
-cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
-plaintext = cipher.decrypt_and_verify(ciphertext_with_tag[:-16], ciphertext_with_tag[-16:])
-return plaintext
-except (ValueError, KeyError) as e:
-print(f"[ASCON GCS] Decryption failed: {e}")
-return None
-
-3. NETWORKING THREADS
-
-def drone_to_gcs_thread():
-"""
-- Listens for encrypted telemetry from the Drone.
-- Decrypts the message.
-- Forwards plaintext to the local GCS application.
-"""
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-print(f"[ASCON GCS] Listening for encrypted drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
-
-code
-Code
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-while True:
-    encrypted_data, addr = sock.recvfrom(4096)
-    plaintext = decrypt_message(encrypted_data)
-    if plaintext:
-        sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
-
-def gcs_to_drone_thread():
-"""
-- Listens for plaintext commands from the local GCS application.
-- Encrypts the command.
-- Sends the encrypted command to the Drone.
-"""
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
-print(f"[ASCON GCS] Listening for plaintext GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
-
-code
-Code
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-while True:
-    plaintext_data, addr = sock.recvfrom(4096)
-    encrypted_command = encrypt_message(plaintext_data)
-    sock.sendto(encrypted_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-4. MAIN LOGIC
-
-if name == "main":
-print("--- GCS ASCON PROXY ---")
-
-code
-Code
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# Start the two networking threads
-thread1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
-thread2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
-
-thread1.start()
-thread2.start()
-
-# Keep the main thread alive
-thread1.join()
-thread2.join()
-code
-Code
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-**`drone_ascon.py`**
-```python
-# ==============================================================================
-# drone_ascon.py
-#
-# Drone-Side Proxy for ASCON-128 Cryptography
-#
+# gcs_ascon.py
+# GCS-Side Proxy for ASCON-128 Cryptography
 # PURPOSE:
-#   - Listens for plaintext MAVLink telemetry from the flight controller.
-#   - Encrypts it using ASCON-128.
-#   - Sends the encrypted telemetry to the GCS.
-#   - Listens for encrypted commands from the GCS.
-#   - Decrypts them using ASCON-128.
-#   - Forwards the plaintext commands to the flight controller.
-#
+# - Listens for encrypted telemetry from the Drone.
+# - Decrypts it using ASCON-128.
+# - Forwards the plaintext MAVLink telemetry to the local GCS application.
+# - Listens for plaintext MAVLink commands from the local GCS application.
+# - Encrypts them using ASCON-128.
+# - Sends the encrypted commands to the Drone.
 # DEPENDENCIES:
-#   - pycryptodome (pip install pycryptodome)
-#   - ip_config.py (must be in the same directory or Python path)
-#
+# - pycryptodome (pip install pycryptodome)
+# - ip_config.py (must be in the same directory or Python path)
 # HOW TO RUN:
-#   This script should be run on the drone's companion computer.
-#   python drone_ascon.py
+# This script is intended to be started by a manager process.
+# To run standalone for testing: python gcs_ascon.py
 # ==============================================================================
 
-import socket
-import threading
-import os
-from Crypto.Cipher import ASCON
-from ip_config import *
+# import socket
+# import threading
+# import os
+# from Crypto.Cipher import ASCON
+# from ip_config import *
 
-## 1. CONFIGURATION ##
-
-# SECURITY WARNING: This key MUST be identical to the one in gcs_ascon.py.
-PSK_ASCON = b'ThisIsA_16ByteKey'
-
-## 2. CRYPTOGRAPHY FUNCTIONS ##
-
-def encrypt_message(plaintext):
-    """
-    Encrypts a plaintext message using ASCON-128.
-    A new random nonce is generated for each message for security.
-    The nonce is prepended to the ciphertext.
-    [nonce (16 bytes)] + [ciphertext + tag]
-    """
-    nonce = os.urandom(16)
-    cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
-    ciphertext, tag = cipher.encrypt_and_digest(plaintext)
-    return nonce + ciphertext + tag
-
-def decrypt_message(encrypted_message):
-    """
-    Decrypts an incoming message using ASCON-128.
-    Splits the nonce from the message, then decrypts and verifies.
-    Returns the plaintext or None if verification fails.
-    """
-    try:
-        nonce = encrypted_message[:16]
-        ciphertext_with_tag = encrypted_message[16:]
-        cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
-        plaintext = cipher.decrypt_and_verify(ciphertext_with_tag[:-16], ciphertext_with_tag[-16:])
-        return plaintext
-    except (ValueError, KeyError) as e:
-        print(f"[ASCON Drone] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-
-def telemetry_to_gcs_thread():
-    """
-    - Listens for plaintext telemetry from the flight controller.
-    - Encrypts the telemetry.
-    - Sends encrypted telemetry to the GCS.
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
-    print(f"[ASCON Drone] Listening for plaintext telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
-
-    while True:
-        plaintext_data, addr = sock.recvfrom(4096)
-        encrypted_telemetry = encrypt_message(plaintext_data)
-        sock.sendto(encrypted_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-
-def commands_from_gcs_thread():
-    """
-    - Listens for encrypted commands from the GCS.
-    - Decrypts the command.
-    - Forwards plaintext command to the flight controller.
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-    print(f"[ASCON Drone] Listening for encrypted GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
-
-    while True:
-        encrypted_data, addr = sock.recvfrom(4096)
-        plaintext_command = decrypt_message(encrypted_data)
-        if plaintext_command:
-            sock.sendto(plaintext_command, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-
-if __name__ == "__main__":
-    print("--- DRONE ASCON PROXY ---")
-    
-    thread1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
-    thread2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
-    
-    thread1.start()
-    thread2.start()
-    
-    thread1.join()
-    thread2.join()
-2. AES-256-GCM (Standard Symmetric AEAD Cipher)
-
-Method: Symmetric encryption using a Pre-Shared Key (PSK). AES-GCM is the industry standard for fast, authenticated encryption.
-
-Security Note: Uses a random 12-byte (96-bit) nonce for every message.
-
-gcs_aes.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# gcs_aes.py
-#
-# GCS-Side Proxy for AES-256-GCM Cryptography
-#
-# PURPOSE:
-#   - Listens for encrypted telemetry from the Drone.
-#   - Decrypts it using AES-256-GCM.
-#   - Forwards the plaintext MAVLink telemetry to the local GCS application.
-#   - Listens for plaintext MAVLink commands from the local GCS application.
-#   - Encrypts them using AES-256-GCM.
-#   - Sends the encrypted commands to the Drone.
-#
-# DEPENDENCIES:
-#   - cryptography (pip install cryptography)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-import os
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from ip_config import *
-
-## 1. CONFIGURATION ##
-
+# 1. CONFIGURATION
 # SECURITY WARNING: This is a pre-shared key (PSK). In a real-world system,
-# this should be derived from a PQC key exchange (like Kyber).
-# Key must be 32 bytes for AES-256.
-PSK_AES = b'ThisIs_A_VerySecure_32ByteKey!!'
-
-## 2. CRYPTOGRAPHY FUNCTIONS ##
-
-def encrypt_message(plaintext):
-    """
-    Encrypts a plaintext message using AES-256-GCM.
-    A new random 12-byte nonce is generated for each message.
-    The nonce is prepended to the ciphertext.
-    [nonce (12 bytes)] + [ciphertext]
-    """
-    nonce = os.urandom(NONCE_IV_SIZE)
-    aesgcm = AESGCM(PSK_AES)
-    ciphertext = aesgcm.encrypt(nonce, plaintext, None) # No associated data
-    return nonce + ciphertext
-
-def decrypt_message(encrypted_message):
-    """
-    Decrypts an incoming message using AES-256-GCM.
-    Splits the nonce, then decrypts and verifies.
-    Returns plaintext or None if verification fails.
-    """
-    try:
-        nonce = encrypted_message[:NONCE_IV_SIZE]
-        ciphertext = encrypted_message[NONCE_IV_SIZE:]
-        aesgcm = AESGCM(PSK_AES)
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-        return plaintext
-    except Exception as e: # Catches InvalidTag exception
-        print(f"[AES GCS] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-
-def drone_to_gcs_thread():
-    """Listens for encrypted telemetry and forwards decrypted data to GCS app."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-    print(f"[AES GCS] Listening for encrypted drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
-
-    while True:
-        encrypted_data, addr = sock.recvfrom(4096)
-        plaintext = decrypt_message(encrypted_data)
-        if plaintext:
-            sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
-
-def gcs_to_drone_thread():
-    """Listens for plaintext commands and sends encrypted data to the drone."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
-    print(f"[AES GCS] Listening for plaintext GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
-
-    while True:
-        plaintext_data, addr = sock.recvfrom(4096)
-        encrypted_command = encrypt_message(plaintext_data)
-        sock.sendto(encrypted_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-
-if __name__ == "__main__":
-    print("--- GCS AES-256-GCM PROXY ---")
-    thread1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
-    thread2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
-    thread1.start()
-    thread2.start()
-    thread1.join()
-    thread2.join()
-
-drone_aes.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# drone_aes.py
-#
-# Drone-Side Proxy for AES-256-GCM Cryptography
-#
-# PURPOSE:
-#   - Listens for plaintext MAVLink telemetry from the flight controller.
-#   - Encrypts it using AES-256-GCM.
-#   - Sends the encrypted telemetry to the GCS.
-#   - Listens for encrypted commands from the GCS.
-#   - Decrypts them using AES-256-GCM.
-#   - Forwards the plaintext commands to the flight controller.
-#
-# DEPENDENCIES:
-#   - cryptography (pip install cryptography)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-import os
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from ip_config import *
-
-## 1. CONFIGURATION ##
-
-# SECURITY WARNING: This key MUST be identical to the one in gcs_aes.py.
-PSK_AES = b'ThisIs_A_VerySecure_32ByteKey!!'
-
-## 2. CRYPTOGRAPHY FUNCTIONS ##
-
-def encrypt_message(plaintext):
-    """Encrypts using AES-256-GCM, prepending a random 12-byte nonce."""
-    nonce = os.urandom(NONCE_IV_SIZE)
-    aesgcm = AESGCM(PSK_AES)
-    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
-    return nonce + ciphertext
-
-def decrypt_message(encrypted_message):
-    """Decrypts using AES-256-GCM after splitting the nonce."""
-    try:
-        nonce = encrypted_message[:NONCE_IV_SIZE]
-        ciphertext = encrypted_message[NONCE_IV_SIZE:]
-        aesgcm = AESGCM(PSK_AES)
-        plaintext = aesgcm.decrypt(nonce, ciphertext, None)
-        return plaintext
-    except Exception as e:
-        print(f"[AES Drone] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-
-def telemetry_to_gcs_thread():
-    """Listens for plaintext telemetry, encrypts, and sends to GCS."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
-    print(f"[AES Drone] Listening for plaintext telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
-
-    while True:
-        plaintext_data, addr = sock.recvfrom(4096)
-        encrypted_telemetry = encrypt_message(plaintext_data)
-        sock.sendto(encrypted_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-
-def commands_from_gcs_thread():
-    """Listens for encrypted commands, decrypts, and forwards to flight controller."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-    print(f"[AES Drone] Listening for encrypted GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
-
-    while True:
-        encrypted_data, addr = sock.recvfrom(4096)
-        plaintext_command = decrypt_message(encrypted_data)
-        if plaintext_command:
-            sock.sendto(plaintext_command, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-
-if __name__ == "__main__":
-    print("--- DRONE AES-256-GCM PROXY ---")
-    thread1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
-    thread2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
-    thread1.start()
-    thread2.start()
-    thread1.join()
-    thread2.join()```
-
-Of course. Here is the continuation of your framework, providing the remaining 6 pairs of crystal-clear, documented scripts.
-
-A Quick Note on Dependencies for This Batch
-
-The following scripts assume you have the pure Python implementations of speck.py and hight.py from your original codebase available in the same directory, as they are not standard installable packages.
-
-For SPECK: Place your speck.py file in the same folder.
-
-For HIGHT: Place your hight.py file in the same folder.
-
-Step 3 (Continued): The 16 Crystal Clear Scripts
-3. Camellia (Symmetric Block Cipher - CBC Mode)
-
-Method: Symmetric encryption using a PSK. Your cryptography library backend uses CBC mode.
-
-Security Warning: CBC mode on its own does not provide authenticity. In a real system, you would need to add a Message Authentication Code (MAC), like HMAC, to prevent tampering. For simplicity, this example omits the MAC but it is a critical consideration. A random IV is used for each message.
-
-gcs_camellia.py
-
-code
-Python
-download
-content_copy
-expand_less
-
-# ==============================================================================
-# gcs_camellia.py
-#
-# GCS-Side Proxy for Camellia Cryptography (CBC Mode)
-#
-# PURPOSE:
-#   Implements the GCS-side logic for Camellia encryption. It uses the
-#   CustomCamelliaCipher class from your previous work, which is an excellent
-#   way to leverage the `cryptography` library's backend.
-#
-# SECURITY WARNING:
-#   This implementation uses CBC mode, which provides confidentiality but NOT
-#   authenticity. An attacker could potentially modify ciphertext without
-#   being detected. For a production system, you MUST add a Message
-#   Authentication Code (e.g., HMAC-SHA256) to each message.
-#
-# DEPENDENCIES:
-#   - cryptography (pip install cryptography)
-#   - ip_config.py
-#   - camellia.py (Your custom implementation)
-# ==============================================================================
-
-import socket
-import threading
-import os
-from cryptography.hazmat.primitives.padding import PKCS7
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from ip_config import *
-
-## 1. YOUR CUSTOM CAMELLIA IMPLEMENTATION ##
-# This is based on the high-quality class you provided.
-class CustomCamelliaCipher:
-    def __init__(self, key):
-        if len(key) not in (16, 24, 32):
-            raise ValueError("Key must be 16, 24, or 32 bytes.")
-        self.key = key
-        self.block_size = 128  # Camellia block size is 128 bits (16 bytes)
-
-    def encrypt(self, plaintext, iv):
-        padder = PKCS7(self.block_size).padder()
-        padded_data = padder.update(plaintext) + padder.finalize()
-        cipher = Cipher(algorithms.Camellia(self.key), modes.CBC(iv))
-        encryptor = cipher.encryptor()
-        return encryptor.update(padded_data) + encryptor.finalize()
-
-    def decrypt(self, ciphertext, iv):
-        cipher = Cipher(algorithms.Camellia(self.key), modes.CBC(iv))
-        decryptor = cipher.decryptor()
-        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-        unpadder = PKCS7(self.block_size).unpadder()
-        return unpadder.update(padded_plaintext) + unpadder.finalize()
-
-## 2. CONFIGURATION ##
-
-# Pre-Shared Key. Must be 16, 24, or 32 bytes.
-PSK_CAMELLIA = b'MySecureCamelliaKey_16Bytes12345'
-camellia_cipher = CustomCamelliaCipher(PSK_CAMELLIA)
-
-## 3. CRYPTOGRAPHY FUNCTIONS ##
-
-def encrypt_message(plaintext):
-    """Encrypts using Camellia-CBC, prepending a random 16-byte IV."""
-    iv = os.urandom(16)  # CBC requires a 16-byte IV
-    ciphertext = camellia_cipher.encrypt(plaintext, iv)
-    return iv + ciphertext
-
-def decrypt_message(encrypted_message):
-    """Decrypts using Camellia-CBC after splitting the IV."""
-    try:
-        iv = encrypted_message[:16]
-        ciphertext = encrypted_message[16:]
-        return camellia_cipher.decrypt(ciphertext, iv)
-    except Exception as e:
-        print(f"[Camellia GCS] Decryption failed: {e}")
-        return None
-
-## 4. NETWORKING THREADS ##
-
-def drone_to_gcs_thread():
-    """Listens for encrypted telemetry and forwards decrypted data."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-    print(f"[Camellia GCS] Listening for drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
-    while True:
-        encrypted_data, addr = sock.recvfrom(4096)
-        plaintext = decrypt_message(encrypted_data)
-        if plaintext:
-            sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
-
-def gcs_to_drone_thread():
-    """Listens for plaintext commands and sends encrypted data."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
-    print(f"[Camellia GCS] Listening for GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
-    while True:
-        plaintext_data, addr = sock.recvfrom(4096)
-        encrypted_command = encrypt_message(plaintext_data)
-        sock.sendto(encrypted_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-
-## 5. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- GCS CAMELLIA PROXY ---")
-    t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-
-drone_camellia.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# drone_camellia.py
-#
-# Drone-Side Proxy for Camellia Cryptography (CBC Mode)
-#
-# PURPOSE:
-#   Mirrors the GCS-side proxy for Camellia, performing the opposite
-#   encryption/decryption operations for the two MAVLink streams.
-#
-# SECURITY WARNING:
-#   This implementation uses CBC mode, which provides confidentiality but NOT
-#   authenticity. A separate Message Authentication Code (MAC) is required
-#   for a secure production system.
-#
-# DEPENDENCIES:
-#   - cryptography (pip install cryptography)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-import os
-from cryptography.hazmat.primitives.padding import PKCS7
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
-from ip_config import *
-
-## 1. YOUR CUSTOM CAMELLIA IMPLEMENTATION ##
-class CustomCamelliaCipher:
-    def __init__(self, key):
-        if len(key) not in (16, 24, 32):
-            raise ValueError("Key must be 16, 24, or 32 bytes.")
-        self.key = key
-        self.block_size = 128
-
-    def encrypt(self, plaintext, iv):
-        padder = PKCS7(self.block_size).padder()
-        padded_data = padder.update(plaintext) + padder.finalize()
-        cipher = Cipher(algorithms.Camellia(self.key), modes.CBC(iv))
-        encryptor = cipher.encryptor()
-        return encryptor.update(padded_data) + encryptor.finalize()
-
-    def decrypt(self, ciphertext, iv):
-        cipher = Cipher(algorithms.Camellia(self.key), modes.CBC(iv))
-        decryptor = cipher.decryptor()
-        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
-        unpadder = PKCS7(self.block_size).unpadder()
-        return unpadder.update(padded_plaintext) + unpadder.finalize()
-
-## 2. CONFIGURATION ##
-PSK_CAMELLIA = b'MySecureCamelliaKey_16Bytes12345'
-camellia_cipher = CustomCamelliaCipher(PSK_CAMELLIA)
-
-## 3. CRYPTOGRAPHY FUNCTIONS ##
-def encrypt_message(plaintext):
-    """Encrypts using Camellia-CBC, prepending a random 16-byte IV."""
-    iv = os.urandom(16)
-    ciphertext = camellia_cipher.encrypt(plaintext, iv)
-    return iv + ciphertext
-
-def decrypt_message(encrypted_message):
-    """Decrypts using Camellia-CBC after splitting the IV."""
-    try:
-        iv = encrypted_message[:16]
-        ciphertext = encrypted_message[16:]
-        return camellia_cipher.decrypt(ciphertext, iv)
-    except Exception as e:
-        print(f"[Camellia Drone] Decryption failed: {e}")
-        return None
-
-## 4. NETWORKING THREADS ##
-def telemetry_to_gcs_thread():
-    """Listens for plaintext telemetry, encrypts, and sends to GCS."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
-    print(f"[Camellia Drone] Listening for telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
-    while True:
-        plaintext_data, addr = sock.recvfrom(4096)
-        encrypted_telemetry = encrypt_message(plaintext_data)
-        sock.sendto(encrypted_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-
-def commands_from_gcs_thread():
-    """Listens for encrypted commands, decrypts, and forwards to flight controller."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-    print(f"[Camellia Drone] Listening for GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
-    while True:
-        encrypted_data, addr = sock.recvfrom(4096)
-        plaintext_command = decrypt_message(encrypted_data)
-        if plaintext_command:
-            sock.sendto(plaintext_command, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
-
-## 5. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- DRONE CAMELLIA PROXY ---")
-    t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-4. SPECK (Lightweight Symmetric Block Cipher - CBC Mode)
-
-Method: Symmetric encryption using a PSK. Based on your pure Python speck.py file.
-
-Security Warning: Same as Camellia. CBC mode requires a separate MAC for authenticity. A random IV is used.
-
-Action Required: You must place your speck.py file in the same directory for the import to work.
-
-gcs_speck.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# gcs_speck.py
-#
-# GCS-Side Proxy for SPECK Lightweight Cryptography (CBC Mode)
-#
-# PURPOSE:
-#   Implements the GCS-side logic for SPECK encryption. It relies on your
-#   custom `speck.py` module.
-#
-# SECURITY WARNING:
-#   Like the Camellia example, this uses CBC mode which lacks authenticity.
-#   A MAC (like HMAC) is required for a secure system.
-#
-# DEPENDENCIES:
-#   - pycryptodome (for padding)
-#   - ip_config.py
-#   - speck.py (Your custom implementation must be in the same folder)
-# ==============================================================================
-
-import socket
-import threading
-import os
-from Crypto.Util.Padding import pad, unpad
-from speck import Python_SPECK # Assuming your class is named Python_SPECK
-from ip_config import *
-
-## 1. CONFIGURATION ##
-PSK_SPECK = b'MySecureSpeckKey'  # Must match the drone's key
-# The IV for CBC mode will be generated randomly for each message.
-# The IV in the Python_SPECK class constructor is just an initial placeholder.
-IV_PLACEHOLDER = b'\x00' * 16
-
-## 2. CRYPTOGRAPHY FUNCTIONS ##
-
-def encrypt_message(plaintext):
-    """Encrypts using SPECK-CBC, prepending a random 16-byte IV."""
-    iv = os.urandom(16)
-    # The class seems to manage its IV state internally after initialization.
-    # To encrypt each message with a new IV, we create a new cipher object.
-    cipher = Python_SPECK(key=PSK_SPECK, IV=iv)
-    # Pad the plaintext to be a multiple of the block size (16 bytes for Speck-128)
-    padded_plaintext = pad(plaintext, cipher.block_size)
-    ciphertext = cipher.encrypt(padded_plaintext)
-    return iv + ciphertext
-
-def decrypt_message(encrypted_message):
-    """Decrypts using SPECK-CBC after splitting the IV."""
-    try:
-        iv = encrypted_message[:16]
-        ciphertext = encrypted_message[16:]
-        cipher = Python_SPECK(key=PSK_SPECK, IV=iv)
-        decrypted_padded = cipher.decrypt(ciphertext)
-        return unpad(decrypted_padded, cipher.block_size)
-    except Exception as e:
-        print(f"[SPECK GCS] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-
-def drone_to_gcs_thread():
-    """Listens for encrypted telemetry and forwards decrypted data."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-    print(f"[SPECK GCS] Listening for drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
-    while True:
-        encrypted_data, addr = sock.recvfrom(4096)
-        plaintext = decrypt_message(encrypted_data)
-        if plaintext:
-            sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
-
-def gcs_to_drone_thread():
-    """Listens for plaintext commands and sends encrypted data."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
-    print(f"[SPECK GCS] Listening for GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
-    while True:
-        plaintext_data, addr = sock.recvfrom(4096)
-        encrypted_command = encrypt_message(plaintext_data)
-        sock.sendto(encrypted_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- GCS SPECK PROXY ---")
-    t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-
-drone_speck.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# drone_speck.py
-#
-# Drone-Side Proxy for SPECK Lightweight Cryptography (CBC Mode)
-#
-# PURPOSE:
-#   Mirrors the GCS-side SPECK proxy.
-#
-# SECURITY WARNING:
-#   CBC mode requires a separate Message Authentication Code (MAC) for security.
-#
-# DEPENDENCIES:
-#   - pycryptodome (for padding)
-#   - ip_config.py
-#   - speck.py (Your custom implementation must be in the same folder)
-# ==============================================================================
-
-import socket
-import threading
-import os
-from Crypto.Util.Padding import pad, unpad
-from speck import Python_SPECK
-from ip_config import *
-
-## 1. CONFIGURATION ##
-PSK_SPECK = b'MySecureSpeckKey'
-IV_PLACEHOLDER = b'\x00' * 16
-
-## 2. CRYPTOGRAPHY FUNCTIONS ##
-
-def encrypt_message(plaintext):
-    """Encrypts using SPECK-CBC, prepending a random 16-byte IV."""
-    iv = os.urandom(16)
-    cipher = Python_SPECK(key=PSK_SPECK, IV=iv)
-    padded_plaintext = pad(plaintext, cipher.block_size)
-    ciphertext = cipher.encrypt(padded_plaintext)
-    return iv + ciphertext
-
-def decrypt_message(encrypted_message):
-    """Decrypts using SPECK-CBC after splitting the IV."""
-    try:
-        iv = encrypted_message[:16]
-        ciphertext = encrypted_message[16:]
-        cipher = Python_SPECK(key=PSK_SPECK, IV=iv)
-        decrypted_padded = cipher.decrypt(ciphertext)
-        return unpad(decrypted_padded, cipher.block_size)
-    except Exception as e:
-        print(f"[SPECK Drone] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-
-def telemetry_to_gcs_thread():
-    """Listens for plaintext telemetry, encrypts, and sends to GCS."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
-    print(f"[SPECK Drone] Listening for telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
-    while True:
-        plaintext_data, addr = sock.recvfrom(4096)
-        encrypted_telemetry = encrypt_message(plaintext_data)
-        sock.sendto(encrypted_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-
-def commands_from_gcs_thread():
-    """Listens for encrypted commands, decrypts, and forwards to flight controller."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-    print(f"[SPECK Drone] Listening for GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
-    while True:
-        encrypted_data, addr = sock.recvfrom(4096)
-        plaintext_command = decrypt_message(encrypted_data)
-        if plaintext_command:
-            sock.sendto(plaintext_command, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- DRONE SPECK PROXY ---")
-    t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-5. HIGHT (Lightweight Symmetric Block Cipher - CBC Mode)
-
-Method: Symmetric encryption using a PSK. Based on your pure Python hight.py file.
-
-Security Warning: Same as Camellia/SPECK. CBC mode requires a separate MAC.
-
-Action Required: You must place your hight.py and hight_CBC.py files in the same directory.
-
-gcs_hight.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# gcs_hight.py
-#
-# GCS-Side Proxy for HIGHT Lightweight Cryptography (CBC Mode)
-#
-# SECURITY WARNING:
-#   CBC mode lacks authenticity. A MAC (like HMAC) is required.
-#
-# DEPENDENCIES:
-#   - pycryptodome (for padding)
-#   - ip_config.py
-#   - hight.py, hight_CBC.py (Your implementations)
-# ==============================================================================
-
-import socket
-import threading
-import os
-from Crypto.Util.Padding import pad, unpad
-from hight_CBC import cbc_hight_encryption, cbc_hight_decryption
-from ip_config import *
-
-## 1. CONFIGURATION ##
-PSK_HIGHT_MK = [0x88, 0xE3, 0x4F, 0x8F, 0x08, 0x17, 0x79, 0xF1, 0xE9, 0xF3, 0x94, 0x37, 0x0A, 0xD4, 0x05, 0x89]
-BLOCK_SIZE = 8 # HIGHT has a 64-bit (8-byte) block size
-
-## 2. CRYPTOGRAPHY FUNCTIONS ##
-def encrypt_message(plaintext):
-    """Encrypts using HIGHT-CBC, prepending a random 8-byte IV."""
-    iv = list(os.urandom(BLOCK_SIZE))
-    padded_plaintext = list(pad(plaintext, BLOCK_SIZE))
-    ciphertext = cbc_hight_encryption(padded_plaintext, iv, PSK_HIGHT_MK)
-    return bytes(iv) + bytes(ciphertext)
-
-def decrypt_message(encrypted_message):
-    """Decrypts using HIGHT-CBC after splitting the IV."""
-    try:
-        iv = list(encrypted_message[:BLOCK_SIZE])
-        ciphertext = list(encrypted_message[BLOCK_SIZE:])
-        decrypted_padded = cbc_hight_decryption(ciphertext, iv, PSK_HIGHT_MK)
-        return unpad(bytes(decrypted_padded), BLOCK_SIZE)
-    except Exception as e:
-        print(f"[HIGHT GCS] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-def drone_to_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-    print(f"[HIGHT GCS] Listening on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        plaintext = decrypt_message(data)
-        if plaintext:
-            sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
-
-def gcs_to_drone_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
-    print(f"[HIGHT GCS] Listening on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        encrypted = encrypt_message(data)
-        sock.sendto(encrypted, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- GCS HIGHT PROXY ---")
-    t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-
-drone_hight.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# drone_hight.py
-#
-# Drone-Side Proxy for HIGHT Lightweight Cryptography (CBC Mode)
-#
-# SECURITY WARNING:
-#   CBC mode lacks authenticity. A MAC (like HMAC) is required.
-#
-# DEPENDENCIES:
-#   - pycryptodome (for padding)
-#   - ip_config.py
-#   - hight.py, hight_CBC.py (Your implementations)
-# ==============================================================================
-
-import socket
-import threading
-import os
-from Crypto.Util.Padding import pad, unpad
-from hight_CBC import cbc_hight_encryption, cbc_hight_decryption
-from ip_config import *
-
-## 1. CONFIGURATION ##
-PSK_HIGHT_MK = [0x88, 0xE3, 0x4F, 0x8F, 0x08, 0x17, 0x79, 0xF1, 0xE9, 0xF3, 0x94, 0x37, 0x0A, 0xD4, 0x05, 0x89]
-BLOCK_SIZE = 8
-
-## 2. CRYPTOGRAPHY FUNCTIONS ##
-def encrypt_message(plaintext):
-    """Encrypts using HIGHT-CBC, prepending a random 8-byte IV."""
-    iv = list(os.urandom(BLOCK_SIZE))
-    padded_plaintext = list(pad(plaintext, BLOCK_SIZE))
-    ciphertext = cbc_hight_encryption(padded_plaintext, iv, PSK_HIGHT_MK)
-    return bytes(iv) + bytes(ciphertext)
-
-def decrypt_message(encrypted_message):
-    """Decrypts using HIGHT-CBC after splitting the IV."""
-    try:
-        iv = list(encrypted_message[:BLOCK_SIZE])
-        ciphertext = list(encrypted_message[BLOCK_SIZE:])
-        decrypted_padded = cbc_hight_decryption(ciphertext, iv, PSK_HIGHT_MK)
-        return unpad(bytes(decrypted_padded), BLOCK_SIZE)
-    except Exception as e:
-        print(f"[HIGHT Drone] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-def telemetry_to_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
-    print(f"[HIGHT Drone] Listening on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        encrypted = encrypt_message(data)
-        sock.sendto(encrypted, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-
-def commands_from_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-    print(f"[HIGHT Drone] Listening on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        plaintext = decrypt_message(data)
-        if plaintext:
-            sock.sendto(plaintext, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- DRONE HIGHT PROXY ---")
-    t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-6. KYBER + AES (Post-Quantum Hybrid Encryption)
-
-Method: This is the correct, modern approach. We use Kyber (a PQC KEM) one time at the beginning to securely establish a shared secret. This secret is then used as the key for AES-256-GCM for all subsequent messages. This gives us both post-quantum security for the key exchange and the high speed of AES for data transmission.
-
-Security: This is a very secure method, combining post-quantum key establishment with a fast, authenticated symmetric cipher.
-
-gcs_kyber_hybrid.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# gcs_kyber_hybrid.py
-#
-# GCS-Side Proxy for Hybrid Post-Quantum Cryptography
-#
-# METHOD:
-#   1. KEY EXCHANGE (PQC): Use Kyber1024 to securely establish a shared secret.
-#      - GCS generates a Kyber keypair.
-#      - GCS sends its public key to the Drone.
-#      - Drone encapsulates a secret and sends the ciphertext back.
-#      - GCS decapsulates to get the same shared secret.
-#   2. DATA EXCHANGE (Symmetric): Use the shared secret as a key for AES-256-GCM
-#      to encrypt and authenticate all subsequent MAVLink messages.
-#
-# This hybrid approach provides post-quantum security for the key exchange
-# and the high performance of AES for the bulk data transfer.
-#
-# DEPENDENCIES:
-#   - oqs (pip install oqs)
-#   - cryptography (pip install cryptography)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-import os
-import oqs
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from ip_config import *
-
-## 1. POST-QUANTUM KEY EXCHANGE ##
-
-print("[KYBER GCS] Starting Post-Quantum Key Exchange...")
-
-# GCS generates a Kyber keypair.
-kem = oqs.KeyEncapsulation("Kyber1024")
-gcs_public_key = kem.generate_keypair()
-
-# Use a simple TCP socket for the one-time key exchange for reliability.
-# The server (GCS) waits for the client (Drone) to connect.
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
-exchange_sock.listen(1)
-print(f"[KYBER GCS] Waiting for Drone to connect for key exchange on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
-conn, addr = exchange_sock.accept()
-print(f"[KYBER GCS] Drone connected from {addr}")
-
-# Send the public key to the Drone.
-conn.sendall(gcs_public_key)
-print("[KYBER GCS] Public key sent.")
-
-# Receive the ciphertext from the Drone.
-ciphertext = conn.recv(4096)
-print("[KYBER GCS] Ciphertext received.")
-
-# Decapsulate the ciphertext to get the shared secret.
-shared_secret = kem.decap_secret(ciphertext)
-
-# The first 32 bytes of the shared secret will be our AES key.
-AES_KEY = shared_secret[:32]
-aesgcm = AESGCM(AES_KEY)
-print("✅ [KYBER GCS] Secure shared key established successfully!")
-conn.close()
-exchange_sock.close()
-
-
-## 2. SYMMETRIC CRYPTOGRAPHY FUNCTIONS (using the established key) ##
-
-def encrypt_message(plaintext):
-    nonce = os.urandom(NONCE_IV_SIZE)
-    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
-    return nonce + ciphertext
-
-def decrypt_message(encrypted_message):
-    try:
-        nonce = encrypted_message[:NONCE_IV_SIZE]
-        ciphertext = encrypted_message[NONCE_IV_SIZE:]
-        return aesgcm.decrypt(nonce, ciphertext, None)
-    except Exception as e:
-        print(f"[AES GCS] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-
-def drone_to_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-    print(f"[KYBER GCS] Now listening for encrypted drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        plaintext = decrypt_message(data)
-        if plaintext:
-            sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
-
-def gcs_to_drone_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
-    print(f"[KYBER GCS] Now listening for plaintext GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        encrypted = encrypt_message(data)
-        sock.sendto(encrypted, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- GCS KYBER HYBRID PROXY ---")
-    t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-
-drone_kyber_hybrid.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# drone_kyber_hybrid.py
-#
-# Drone-Side Proxy for Hybrid Post-Quantum Cryptography
-#
-# METHOD:
-#   1. KEY EXCHANGE (PQC): Connects to the GCS to perform a Kyber key exchange.
-#      - Receives the GCS's public key.
-#      - Generates and encapsulates a shared secret.
-#      - Sends the resulting ciphertext to the GCS.
-#   2. DATA EXCHANGE (Symmetric): Uses the derived shared secret as a key for
-#      AES-256-GCM to secure all MAVLink messages.
-#
-# DEPENDENCIES:
-#   - oqs (pip install oqs)
-#   - cryptography (pip install cryptography)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-import os
-import time
-import oqs
-from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-from ip_config import *
-
-## 1. POST-QUANTUM KEY EXCHANGE ##
-
-print("[KYBER Drone] Starting Post-Quantum Key Exchange...")
-
-# Drone acts as the client in the key exchange.
-kem = oqs.KeyEncapsulation("Kyber1024")
-
-# Connect to the GCS to exchange keys.
-# Retry connection in case the GCS proxy isn't ready yet.
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-while True:
-    try:
-        exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
-        break
-    except ConnectionRefusedError:
-        print("[KYBER Drone] Connection refused. GCS not ready? Retrying in 2 seconds...")
-        time.sleep(2)
-
-print(f"[KYBER Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
-
-# Receive the GCS's public key.
-gcs_public_key = exchange_sock.recv(4096)
-print("[KYBER Drone] Public key received.")
-
-# Encapsulate a secret using the public key. This generates both the
-# ciphertext (to send back) and the shared secret (to keep).
-ciphertext, shared_secret = kem.encap_secret(gcs_public_key)
-
-# Send the ciphertext back to the GCS.
-exchange_sock.sendall(ciphertext)
-print("[KYBER Drone] Ciphertext sent.")
-
-# The first 32 bytes of the shared secret become our AES key.
-AES_KEY = shared_secret[:32]
-aesgcm = AESGCM(AES_KEY)
-print("✅ [KYBER Drone] Secure shared key established successfully!")
-exchange_sock.close()
-
-
-## 2. SYMMETRIC CRYPTOGRAPHY FUNCTIONS (using the established key) ##
-
-def encrypt_message(plaintext):
-    nonce = os.urandom(NONCE_IV_SIZE)
-    ciphertext = aesgcm.encrypt(nonce, plaintext, None)
-    return nonce + ciphertext
-
-def decrypt_message(encrypted_message):
-    try:
-        nonce = encrypted_message[:NONCE_IV_SIZE]
-        ciphertext = encrypted_message[NONCE_IV_SIZE:]
-        return aesgcm.decrypt(nonce, ciphertext, None)
-    except Exception as e:
-        print(f"[AES Drone] Decryption failed: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-
-def telemetry_to_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
-    print(f"[KYBER Drone] Now listening for plaintext telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        encrypted = encrypt_message(data)
-        sock.sendto(encrypted, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-
-def commands_from_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-    print(f"[KYBER Drone] Now listening for encrypted GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        plaintext = decrypt_message(data)
-        if plaintext:
-            sock.sendto(plaintext, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- DRONE KYBER HYBRID PROXY ---")
-    t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-7. DILITHIUM (Post-Quantum Signature)
-
-Method: This provides authenticity and integrity, but not confidentiality. Every message is sent in plaintext but is accompanied by a digital signature. The receiver can verify that the message came from the correct sender and was not altered in transit.
-
-Security: Uses the NIST-standardized PQC signature scheme ML-DSA (Dilithium).
-
-gcs_dilithium.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# gcs_dilithium.py
-#
-# GCS-Side Proxy for Post-Quantum Digital Signatures (ML-DSA/Dilithium)
-#
-# METHOD:
-#   This proxy DOES NOT ENCRYPT data. It provides authenticity and integrity.
-#   1. KEY EXCHANGE: GCS and Drone generate their own Dilithium keypairs and
-#      exchange their public keys.
-#   2. DATA EXCHANGE:
-#      - Every plaintext MAVLink command from the GCS is signed with the GCS's
-#        private key. The message and signature are sent to the drone.
-#      - Every plaintext MAVLink telemetry packet from the drone is signed.
-#      - The GCS verifies the signature on incoming telemetry using the drone's
-#        public key before forwarding it.
-#
-# DEPENDENCIES:
-#   - oqs (pip install oqs)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-from ip_config import *
-import oqs
-
-## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
-
-print("[DILITHIUM GCS] Starting PQC Public Key Exchange...")
-
-# GCS generates its own signature keypair.
-SIGNATURE_ALGORITHM = "Dilithium3"
-gcs_signer = oqs.Signature(SIGNATURE_ALGORITHM)
-gcs_public_key = gcs_signer.generate_keypair()
-# The secret key is kept within the gcs_signer object.
-
-# Use TCP for reliable key exchange.
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
-exchange_sock.listen(1)
-print(f"[DILITHIUM GCS] Waiting for Drone to connect for key exchange on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
-conn, addr = exchange_sock.accept()
-print(f"[DILITHIUM GCS] Drone connected from {addr}")
-
-# Exchange public keys: GCS sends first, then receives.
-conn.sendall(gcs_public_key)
-print("[DILITHIUM GCS] GCS public key sent.")
-drone_public_key = conn.recv(4096)
-print("[DILITHIUM GCS] Drone public key received.")
-print("✅ [DILITHIUM GCS] Public key exchange complete!")
-conn.close()
-exchange_sock.close()
-
-
-## 2. SIGNATURE FUNCTIONS ##
-
-# A separator to distinguish the message from the signature.
-SEPARATOR = b'|SIGNATURE|'
-
-def sign_message(plaintext):
-    """Signs a message using the GCS's private key."""
-    signature = gcs_signer.sign(plaintext)
-    return plaintext + SEPARATOR + signature
-
-def verify_message(signed_message):
-    """
-    Verifies a message from the drone using the drone's public key.
-    Returns the plaintext message if valid, otherwise None.
-    """
-    try:
-        plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
-        verifier = oqs.Signature(SIGNATURE_ALGORITHM)
-        is_valid = verifier.verify(plaintext, signature, drone_public_key)
-        if is_valid:
-            return plaintext
-        else:
-            print("[DILITHIUM GCS] !!! SIGNATURE VERIFICATION FAILED !!!")
-            return None
-    except (ValueError) as e:
-        print(f"[DILITHIUM GCS] Malformed message received, could not split signature: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-
-def drone_to_gcs_thread():
-    """Listens for signed telemetry, verifies, and forwards plaintext."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-    print(f"[DILITHIUM GCS] Listening for signed telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
-    while True:
-        data, addr = sock.recvfrom(8192) # Increased buffer for signature
-        plaintext = verify_message(data)
-        if plaintext:
-            sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
-
-def gcs_to_drone_thread():
-    """Listens for plaintext commands, signs them, and sends to drone."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
-    print(f"[DILITHIUM GCS] Listening for GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        signed_command = sign_message(data)
-        sock.sendto(signed_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- GCS DILITHIUM SIGNATURE PROXY ---")
-    t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-
-drone_dilithium.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# drone_dilithium.py
-#
-# Drone-Side Proxy for Post-Quantum Digital Signatures (ML-DSA/Dilithium)
-#
-# METHOD:
-#   Mirrors the GCS-side signature proxy.
-#   1. KEY EXCHANGE: Connects to the GCS and exchanges public keys.
-#   2. DATA EXCHANGE:
-#      - Signs all outgoing telemetry with the Drone's private key.
-#      - Verifies all incoming commands with the GCS's public key.
-#
-# DEPENDENCIES:
-#   - oqs (pip install oqs)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-import time
-from ip_config import *
-import oqs
-
-## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
-
-print("[DILITHIUM Drone] Starting PQC Public Key Exchange...")
-
-# Drone generates its own signature keypair.
-SIGNATURE_ALGORITHM = "Dilithium3"
-drone_signer = oqs.Signature(SIGNATURE_ALGORITHM)
-drone_public_key = drone_signer.generate_keypair()
-
-# Connect to the GCS to exchange keys.
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-while True:
-    try:
-        exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
-        break
-    except ConnectionRefusedError:
-        print("[DILITHIUM Drone] Connection refused. Retrying in 2 seconds...")
-        time.sleep(2)
-
-print(f"[DILITHIUM Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
-
-# Exchange public keys: Drone receives first, then sends.
-gcs_public_key = exchange_sock.recv(4096)
-print("[DILITHIUM Drone] GCS public key received.")
-exchange_sock.sendall(drone_public_key)
-print("[DILITHIUM Drone] Drone public key sent.")
-print("✅ [DILITHIUM Drone] Public key exchange complete!")
-exchange_sock.close()
-
-## 2. SIGNATURE FUNCTIONS ##
-SEPARATOR = b'|SIGNATURE|'
-
-def sign_message(plaintext):
-    """Signs a message using the Drone's private key."""
-    signature = drone_signer.sign(plaintext)
-    return plaintext + SEPARATOR + signature
-
-def verify_message(signed_message):
-    """Verifies a message from the GCS using the GCS's public key."""
-    try:
-        plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
-        verifier = oqs.Signature(SIGNATURE_ALGORITHM)
-        is_valid = verifier.verify(plaintext, signature, gcs_public_key)
-        return plaintext if is_valid else None
-    except ValueError as e:
-        print(f"[DILITHIUM Drone] Malformed message, could not split signature: {e}")
-        return None
-
-## 3. NETWORKING THREADS ##
-def telemetry_to_gcs_thread():
-    """Listens for plaintext telemetry, signs it, and sends to GCS."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
-    print(f"[DILITHIUM Drone] Listening for telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        signed_telemetry = sign_message(data)
-        sock.sendto(signed_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-
-def commands_from_gcs_thread():
-    """Listens for signed commands, verifies, and forwards to flight controller."""
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-    print(f"[DILITHIUM Drone] Listening for signed GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
-    while True:
-        data, addr = sock.recvfrom(8192)
-        plaintext = verify_message(data)
-        if plaintext:
-            sock.sendto(plaintext, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- DRONE DILITHIUM SIGNATURE PROXY ---")
-    t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-8. FALCON (Post-Quantum Signature)
-
-Method: PQC Signature algorithm, providing authenticity and integrity. The logic is identical to Dilithium, only the algorithm name is changed, demonstrating the modularity of the framework.
-
-Security: Uses the NIST-standardized PQC signature scheme Falcon.
-
-gcs_falcon.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# gcs_falcon.py
-#
-# GCS-Side Proxy for Post-Quantum Digital Signatures (Falcon-512)
-#
-# METHOD:
-#   This proxy is functionally identical to the Dilithium proxy but uses the
-#   Falcon-512 algorithm. It provides authenticity and integrity for MAVLink
-#   messages by signing them. It DOES NOT provide confidentiality.
-#
-# DEPENDENCIES:
-#   - oqs (pip install oqs)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-from ip_config import *
-import oqs
-
-## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
-
-print("[FALCON GCS] Starting PQC Public Key Exchange...")
-SIGNATURE_ALGORITHM = "Falcon-512"
-gcs_signer = oqs.Signature(SIGNATURE_ALGORITHM)
-gcs_public_key = gcs_signer.generate_keypair()
-
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
-exchange_sock.listen(1)
-print(f"[FALCON GCS] Waiting for Drone on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
-conn, addr = exchange_sock.accept()
-print(f"[FALCON GCS] Drone connected from {addr}")
-
-conn.sendall(gcs_public_key)
-print("[FALCON GCS] GCS public key sent.")
-drone_public_key = conn.recv(4096)
-print("[FALCON GCS] Drone public key received.")
-print("✅ [FALCON GCS] Public key exchange complete!")
-conn.close()
-exchange_sock.close()
-
-## 2. SIGNATURE FUNCTIONS ##
-SEPARATOR = b'|SIGNATURE|'
-
-def sign_message(plaintext):
-    signature = gcs_signer.sign(plaintext)
-    return plaintext + SEPARATOR + signature
-
-def verify_message(signed_message):
-    try:
-        plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
-        verifier = oqs.Signature(SIGNATURE_ALGORITHM)
-        if verifier.verify(plaintext, signature, drone_public_key):
-            return plaintext
-        print("[FALCON GCS] !!! SIGNATURE VERIFICATION FAILED !!!")
-        return None
-    except ValueError:
-        print("[FALCON GCS] Malformed message, could not split signature.")
-        return None
-
-## 3. NETWORKING THREADS ##
-def drone_to_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-    print(f"[FALCON GCS] Listening for signed telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
-    while True:
-        data, addr = sock.recvfrom(8192)
-        plaintext = verify_message(data)
-        if plaintext:
-            sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
-
-def gcs_to_drone_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
-    print(f"[FALCON GCS] Listening for GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        signed_command = sign_message(data)
-        sock.sendto(signed_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- GCS FALCON SIGNATURE PROXY ---")
-    t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-
-drone_falcon.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# drone_falcon.py
-#
-# Drone-Side Proxy for Post-Quantum Digital Signatures (Falcon-512)
-#
-# METHOD:
-#   Mirrors the GCS-side Falcon proxy, providing authenticity for telemetry
-#   and verifying commands from the GCS.
-#
-# DEPENDENCIES:
-#   - oqs (pip install oqs)
-#   - ip_config.py
-# ==============================================================================
-
-import socket
-import threading
-import time
-from ip_config import *
-import oqs
-
-## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
-
-print("[FALCON Drone] Starting PQC Public Key Exchange...")
-SIGNATURE_ALGORITHM = "Falcon-512"
-drone_signer = oqs.Signature(SIGNATURE_ALGORITHM)
-drone_public_key = drone_signer.generate_keypair()
-
-exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-while True:
-    try:
-        exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
-        break
-    except ConnectionRefusedError:
-        print("[FALCON Drone] Connection refused. Retrying in 2 seconds...")
-        time.sleep(2)
-
-print(f"[FALCON Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
-
-gcs_public_key = exchange_sock.recv(4096)
-print("[FALCON Drone] GCS public key received.")
-exchange_sock.sendall(drone_public_key)
-print("[FALCON Drone] Drone public key sent.")
-print("✅ [FALCON Drone] Public key exchange complete!")
-exchange_sock.close()
-
-## 2. SIGNATURE FUNCTIONS ##
-SEPARATOR = b'|SIGNATURE|'
-
-def sign_message(plaintext):
-    signature = drone_signer.sign(plaintext)
-    return plaintext + SEPARATOR + signature
-
-def verify_message(signed_message):
-    try:
-        plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
-        verifier = oqs.Signature(SIGNATURE_ALGORITHM)
-        return plaintext if verifier.verify(plaintext, signature, gcs_public_key) else None
-    except ValueError:
-        return None
-
-## 3. NETWORKING THREADS ##
-def telemetry_to_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
-    print(f"[FALCON Drone] Listening for telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
-    while True:
-        data, addr = sock.recvfrom(4096)
-        signed_telemetry = sign_message(data)
-        sock.sendto(signed_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
-
-def commands_from_gcs_thread():
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
-    print(f"[FALCON Drone] Listening for signed GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
-    while True:
-        data, addr = sock.recvfrom(8192)
-        plaintext = verify_message(data)
-        if plaintext:
-            sock.sendto(plaintext, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
-
-## 4. MAIN LOGIC ##
-if __name__ == "__main__":
-    print("--- DRONE FALCON SIGNATURE PROXY ---")
-    t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
-    t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
-    t1.start()
-    t2.start()
-    t1.join()
-    t2.join()
-Next Steps
-
-You now have a complete, standardized, and documented set of 16 proxy scripts plus the central configuration file.
-
-Test Locally: Place all 17 files in the same directory. Open two separate terminals, both with your (gcs-env) activated.
-
-In terminal 1, run a GCS proxy: python gcs_kyber_hybrid.py
-
-In terminal 2, run the matching Drone proxy: python drone_kyber_hybrid.py
-
-They should connect, exchange keys, and then wait for data. You can now proceed to build and test your GCS Application and Cryptography Manager against these stable, well-defined components.
-
-Build the Manager: Your local_crypto_manager.py is the final piece of the puzzle. It will be responsible for starting and stopping these scripts based on commands from your main GUI.
-Excellent. We will now build the "brain" of your framework: the Cryptography Manager.
-
-This is the most critical component for making your system robust and easy to control. It acts as a dedicated supervisor, and your main GCS application will give it simple commands without needing to worry about the complex details of managing processes.
-
-We will create two new scripts:
-
-crypto_manager.py: A background service that runs persistently. It listens for commands and physically starts and stops your 8 GCS proxy scripts.
-
-gcs_controller.py: A simple command-line tool to send commands to the manager. Your main GUI will eventually perform this role, but this tool is perfect for testing and direct control.
-
-Step 1: The Cryptography Manager
-
-This script is the switchboard. You will start this once in a terminal and leave it running in the background. It does the hard work of process management.
-
-crypto_manager.py
-
-code
-Python
-download
-content_copy
-expand_less
-
-# ==============================================================================
-# crypto_manager.py
-#
-# PURPOSE:
-#   Acts as a dedicated supervisor for the 8 GCS cryptographic proxies.
-#   This script runs as a persistent background service. It listens on a local
-#   TCP port for simple text commands (e.g., "SWITCH c1") from the main GCS
-#   application or the gcs_controller.py tool.
-#
-#   This approach decouples process management from your main GUI, making the
-#   entire system more robust, modular, and easier to debug.
-#
-# HOW IT WORKS:
-#   1. Starts a TCP server on a local port.
-#   2. Waits for a connection.
-#   3. Receives a command (e.g., "SWITCH c2").
-#   4. If a proxy is already running, it gracefully terminates it. This is
-#      CRITICAL to free up the MAVLink network ports.
-#   5. It looks up the command code (e.g., "c2") in its script map and starts
-#      the corresponding proxy script (e.g., "gcs_kyber_hybrid.py") as a new
-#      subprocess.
-#   6. Sends a confirmation reply ("OK" or "ERROR") back to the controller.
-#
-# HOW TO RUN:
-#   1. Make sure all 16 proxy scripts and ip_config.py are in the same directory.
-#   2. Open a terminal and activate the conda environment: `conda activate gcs-env`
-#   3. Run this script: `python crypto_manager.py`
-#   4. Leave this terminal running.
-# ==============================================================================
-
-import socket
-import subprocess
-import threading
-import os
-import signal
-import sys
-import time
-
-# --- CONFIGURATION ---
-MANAGER_HOST = '127.0.0.1'  # Listen only on localhost for security
-MANAGER_PORT = 5900         # Port for receiving commands
-
-# This map is the "brain" of the manager. It connects the simple command
-# codes (c1, c2, etc.) to the actual script filenames.
-CRYPTO_MAP = {
-    "c1": "gcs_ascon.py",
-    "c2": "gcs_aes.py",
-    "c3": "gcs_camellia.py",
-    "c4": "gcs_speck.py",
-    "c5": "gcs_hight.py",
-    "c6": "gcs_kyber_hybrid.py",
-    "c7": "gcs_dilithium.py",
-    "c8": "gcs_falcon.py",
-}
-
-class CryptoManager:
-    """
-    Manages the lifecycle of GCS cryptographic proxy subprocesses.
-    """
-    def __init__(self):
-        self.current_process = None
-        self.current_code = None
-        # Ensure we use the same Python interpreter that's running this script
-        self.python_executable = sys.executable
-
-    def stop_current_proxy(self):
-        """Gracefully stops the currently running proxy process."""
-        if self.current_process and self.current_process.poll() is None:
-            print(f"[Manager] Stopping proxy '{self.current_code}' (PID: {self.current_process.pid})...")
-            try:
-                # Use process group termination for robustness
-                if os.name == 'nt': # Windows
-                    # Sends CTRL+C, more graceful than taskkill
-                    self.current_process.send_signal(signal.CTRL_C_EVENT)
-                else: # Linux/macOS
-                    os.killpg(os.getpgid(self.current_process.pid), signal.SIGTERM)
-                
-                self.current_process.wait(timeout=3) # Wait up to 3 seconds
-                print("[Manager] Process terminated gracefully.")
-            except subprocess.TimeoutExpired:
-                print("[Manager] Process did not terminate gracefully. Forcing kill...")
-                self.current_process.kill() # Force kill if it doesn't respond
-            except Exception as e:
-                print(f"[Manager] Error stopping process: {e}")
-        self.current_process = None
-        self.current_code = None
-        # Short delay to allow OS to release network sockets
-        time.sleep(0.5)
-
-    def start_proxy(self, code):
-        """Starts a new proxy based on the provided code."""
-        if code not in CRYPTO_MAP:
-            return f"ERROR: Unknown crypto code '{code}'"
-
-        script_name = CRYPTO_MAP[code]
-        script_path = os.path.join(os.path.dirname(__file__), script_name)
-
-        if not os.path.exists(script_path):
-            return f"ERROR: Script '{script_name}' not found."
-
-        print(f"[Manager] Starting proxy '{code}': {script_name}...")
-        try:
-            # Creation flags for creating a new process group on Windows
-            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
-            
-            self.current_process = subprocess.Popen(
-                [self.python_executable, script_path],
-                creationflags=creationflags,
-                preexec_fn=os.setsid if os.name != 'nt' else None # Create new session on POSIX
-            )
-            self.current_code = code
-            # Give it a moment to start and check if it crashed immediately
-            time.sleep(1)
-            if self.current_process.poll() is not None:
-                return f"ERROR: Process for '{script_name}' terminated immediately."
-            
-            print(f"[Manager] Started '{script_name}' successfully (PID: {self.current_process.pid}).")
-            return f"OK: Switched to {code} ({script_name})"
-        except Exception as e:
-            return f"ERROR: Failed to start process for '{script_name}': {e}"
-
-    def handle_command(self, command_str):
-        """Parses and executes a command."""
-        parts = command_str.strip().upper().split()
-        command = parts[0]
-
-        if command == "SWITCH" and len(parts) > 1:
-            code = parts[1].lower()
-            self.stop_current_proxy()
-            response = self.start_proxy(code)
-        elif command == "STOP":
-            self.stop_current_proxy()
-            response = "OK: Proxy stopped."
-        elif command == "STATUS":
-            if self.current_process and self.current_process.poll() is None:
-                response = f"OK: Running {self.current_code} ({CRYPTO_MAP.get(self.current_code)})"
-            else:
-                response = "OK: No proxy running."
-        else:
-            response = "ERROR: Unknown command. Use SWITCH <code>, STOP, or STATUS."
-        
-        return response
-
-def handle_client_connection(conn, manager):
-    """Handles a single client connection to the manager."""
-    try:
-        data = conn.recv(1024)
-        if data:
-            command = data.decode('utf-8')
-            print(f"[Manager] Received command: {command.strip()}")
-            response = manager.handle_command(command)
-            conn.sendall(response.encode('utf-8'))
-    except Exception as e:
-        print(f"[Manager] Error handling client: {e}")
-    finally:
-        conn.close()
-
-def run_manager():
-    manager = CryptoManager()
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((MANAGER_HOST, MANAGER_PORT))
-    server_socket.listen(5)
-    print(f"--- CRYPTOGRAPHY MANAGER ---")
-    print(f"✅ Listening for commands on {MANAGER_HOST}:{MANAGER_PORT}")
-    print("Run gcs_controller.py in another terminal to send commands.")
-
-    try:
-        while True:
-            conn, addr = server_socket.accept()
-            # No need for a new thread if commands are quick
-            handle_client_connection(conn, manager)
-    except KeyboardInterrupt:
-        print("\n[Manager] Shutdown signal received.")
-    finally:
-        print("[Manager] Cleaning up...")
-        manager.stop_current_proxy()
-        server_socket.close()
-        print("[Manager] Shutdown complete.")
-
-if __name__ == "__main__":
-    run_manager()
-Step 2: The GCS Controller Tool
-
-This is your simple, powerful tool for interacting with the manager.
-
-gcs_controller.py
-
-code
-Python
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-# ==============================================================================
-# gcs_controller.py
-#
-# PURPOSE:
-#   A command-line tool to send control commands to the crypto_manager.py.
-#   This simulates the action your main GCS GUI will take when the user
-#   clicks a button to switch cryptographic algorithms.
-#
-#   It connects to the manager via TCP, sends a single command, prints the
-#   response from the manager, and exits.
-#
-# HOW TO RUN:
-#   1. Make sure crypto_manager.py is already running in another terminal.
-#   2. Open a new terminal and activate the conda environment.
-#   3. Run with a command. Examples:
-#
-#      # Switch to the ASCON proxy (c1)
-#      python gcs_controller.py switch c1
-#
-#      # Switch to the Kyber Hybrid proxy (c6)
-#      python gcs_controller.py switch c6
-#
-#      # Check the status of the manager
-#      python gcs_controller.py status
-#
-#      # Stop the currently running proxy
-#      python gcs_controller.py stop
-# ==============================================================================
-
-import socket
-import argparse
-
-# --- CONFIGURATION ---
-# These MUST match the host and port in crypto_manager.py
-MANAGER_HOST = '127.0.0.1'
-MANAGER_PORT = 5900
-
-def send_command(command):
-    """Connects to the manager, sends a command, and prints the response."""
-    try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect((MANAGER_HOST, MANAGER_PORT))
-            sock.sendall(command.encode('utf-8'))
-            response = sock.recv(1024).decode('utf-8')
-            print(f"Response from Manager: {response}")
-    except ConnectionRefusedError:
-        print(f"ERROR: Connection refused. Is crypto_manager.py running on {MANAGER_HOST}:{MANAGER_PORT}?")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Send control commands to the Crypto Manager.")
+# this key should be generated dynamically and exchanged securely, for example,
+# using a Post-Quantum Key Encapsulation Mechanism (KEM) like Kyber.
+# For this example, we use a static key for simplicity.
+# Key must be 16 bytes for ASCON-128.
+
+# PSK_ASCON = b'ThisIsA_16ByteKey'
+
+# 2. CRYPTOGRAPHY FUNCTIONS
+
+# def encrypt_message(plaintext):
+# """
+# Encrypts a plaintext message using ASCON-128.
+# A new random nonce is generated for each message for security.
+# The nonce is prepended to the ciphertext.
+# [nonce (16 bytes)] + [ciphertext + tag]
+# """
+# nonce = os.urandom(16) # ASCON uses a 16-byte nonce
+# cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
+# ciphertext, tag = cipher.encrypt_and_digest(plaintext)
+# return nonce + ciphertext + tag
+
+# def decrypt_message(encrypted_message):
+# """
+# Decrypts an incoming message using ASCON-128.
+# Splits the nonce from the message, then decrypts and verifies.
+# Returns the plaintext or None if verification fails.
+# """
+# try:
+# nonce = encrypted_message[:16]
+# ciphertext_with_tag = encrypted_message[16:]
+# cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
+# plaintext = cipher.decrypt_and_verify(ciphertext_with_tag[:-16], ciphertext_with_tag[-16:])
+# return plaintext
+# except (ValueError, KeyError) as e:
+# print(f"[ASCON GCS] Decryption failed: {e}")
+# return None
+
+# 3. NETWORKING THREADS
+
+# def drone_to_gcs_thread():
+# """
+# - Listens for encrypted telemetry from the Drone.
+# - Decrypts the message.
+# - Forwards plaintext to the local GCS application.
+# """
+# sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+# print(f"[ASCON GCS] Listening for encrypted drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
+
+# code
+# Code
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# while True:
+#     encrypted_data, addr = sock.recvfrom(4096)
+#     plaintext = decrypt_message(encrypted_data)
+#     if plaintext:
+#         sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
+
+# def gcs_to_drone_thread():
+# """
+# - Listens for plaintext commands from the local GCS application.
+# - Encrypts the command.
+# - Sends the encrypted command to the Drone.
+# """
+# sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
+# print(f"[ASCON GCS] Listening for plaintext GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
+
+# code
+# Code
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# while True:
+#     plaintext_data, addr = sock.recvfrom(4096)
+#     encrypted_command = encrypt_message(plaintext_data)
+#     sock.sendto(encrypted_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+# 4. MAIN LOGIC
+
+# if name == "main":
+# print("--- GCS ASCON PROXY ---")
+
+# code
+# Code
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # Start the two networking threads
+# thread1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
+# thread2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
+
+# thread1.start()
+# thread2.start()
+
+# # Keep the main thread alive
+# thread1.join()
+# thread2.join()
+# code
+# Code
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# **`drone_ascon.py`**
+# ```python
+# # ==============================================================================
+# # drone_ascon.py
+# #
+# # Drone-Side Proxy for ASCON-128 Cryptography
+# #
+# # PURPOSE:
+# #   - Listens for plaintext MAVLink telemetry from the flight controller.
+# #   - Encrypts it using ASCON-128.
+# #   - Sends the encrypted telemetry to the GCS.
+# #   - Listens for encrypted commands from the GCS.
+# #   - Decrypts them using ASCON-128.
+# #   - Forwards the plaintext commands to the flight controller.
+# #
+# # DEPENDENCIES:
+# #   - pycryptodome (pip install pycryptodome)
+# #   - ip_config.py (must be in the same directory or Python path)
+# #
+# # HOW TO RUN:
+# #   This script should be run on the drone's companion computer.
+# #   python drone_ascon.py
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# from Crypto.Cipher import ASCON
+# from ip_config import *
+
+# ## 1. CONFIGURATION ##
+
+# # SECURITY WARNING: This key MUST be identical to the one in gcs_ascon.py.
+# PSK_ASCON = b'ThisIsA_16ByteKey'
+
+# ## 2. CRYPTOGRAPHY FUNCTIONS ##
+
+# def encrypt_message(plaintext):
+#     """
+#     Encrypts a plaintext message using ASCON-128.
+#     A new random nonce is generated for each message for security.
+#     The nonce is prepended to the ciphertext.
+#     [nonce (16 bytes)] + [ciphertext + tag]
+#     """
+#     nonce = os.urandom(16)
+#     cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
+#     ciphertext, tag = cipher.encrypt_and_digest(plaintext)
+#     return nonce + ciphertext + tag
+
+# def decrypt_message(encrypted_message):
+#     """
+#     Decrypts an incoming message using ASCON-128.
+#     Splits the nonce from the message, then decrypts and verifies.
+#     Returns the plaintext or None if verification fails.
+#     """
+#     try:
+#         nonce = encrypted_message[:16]
+#         ciphertext_with_tag = encrypted_message[16:]
+#         cipher = ASCON.new(key=PSK_ASCON, mode=ASCON.MODE_EAX, nonce=nonce)
+#         plaintext = cipher.decrypt_and_verify(ciphertext_with_tag[:-16], ciphertext_with_tag[-16:])
+#         return plaintext
+#     except (ValueError, KeyError) as e:
+#         print(f"[ASCON Drone] Decryption failed: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+
+# def telemetry_to_gcs_thread():
+#     """
+#     - Listens for plaintext telemetry from the flight controller.
+#     - Encrypts the telemetry.
+#     - Sends encrypted telemetry to the GCS.
+#     """
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
+#     print(f"[ASCON Drone] Listening for plaintext telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
+
+#     while True:
+#         plaintext_data, addr = sock.recvfrom(4096)
+#         encrypted_telemetry = encrypt_message(plaintext_data)
+#         sock.sendto(encrypted_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+
+# def commands_from_gcs_thread():
+#     """
+#     - Listens for encrypted commands from the GCS.
+#     - Decrypts the command.
+#     - Forwards plaintext command to the flight controller.
+#     """
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+#     print(f"[ASCON Drone] Listening for encrypted GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
+
+#     while True:
+#         encrypted_data, addr = sock.recvfrom(4096)
+#         plaintext_command = decrypt_message(encrypted_data)
+#         if plaintext_command:
+#             sock.sendto(plaintext_command, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+
+# if __name__ == "__main__":
+#     print("--- DRONE ASCON PROXY ---")
     
-    # Using subparsers for a clean command structure like 'git push' or 'docker run'
-    subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
+#     thread1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
+#     thread2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
+    
+#     thread1.start()
+#     thread2.start()
+    
+#     thread1.join()
+#     thread2.join()
+# 2. AES-256-GCM (Standard Symmetric AEAD Cipher)
 
-    # 'switch' command
-    parser_switch = subparsers.add_parser("switch", help="Switch to a specific crypto proxy.")
-    parser_switch.add_argument("code", type=str, help="The crypto code to switch to (e.g., c1, c2, ... c8).")
+# Method: Symmetric encryption using a Pre-Shared Key (PSK). AES-GCM is the industry standard for fast, authenticated encryption.
 
-    # 'status' command
-    parser_status = subparsers.add_parser("status", help="Check the current status of the crypto proxy.")
+# Security Note: Uses a random 12-byte (96-bit) nonce for every message.
 
-    # 'stop' command
-    parser_stop = subparsers.add_parser("stop", help="Stop the currently running crypto proxy.")
+# gcs_aes.py
 
-    args = parser.parse_args()
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # gcs_aes.py
+# #
+# # GCS-Side Proxy for AES-256-GCM Cryptography
+# #
+# # PURPOSE:
+# #   - Listens for encrypted telemetry from the Drone.
+# #   - Decrypts it using AES-256-GCM.
+# #   - Forwards the plaintext MAVLink telemetry to the local GCS application.
+# #   - Listens for plaintext MAVLink commands from the local GCS application.
+# #   - Encrypts them using AES-256-GCM.
+# #   - Sends the encrypted commands to the Drone.
+# #
+# # DEPENDENCIES:
+# #   - cryptography (pip install cryptography)
+# #   - ip_config.py
+# # ==============================================================================
 
-    # Construct the command string from the parsed arguments
-    if args.command == "switch":
-        full_command = f"SWITCH {args.code}"
-    else: # For 'status' and 'stop'
-        full_command = args.command.upper()
+# import socket
+# import threading
+# import os
+# from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+# from ip_config import *
 
-    send_command(full_command)
-How to Use This Framework
+# ## 1. CONFIGURATION ##
 
-You are now ready to test the core logic of your system.
+# # SECURITY WARNING: This is a pre-shared key (PSK). In a real-world system,
+# # this should be derived from a PQC key exchange (like Kyber).
+# # Key must be 32 bytes for AES-256.
+# PSK_AES = b'ThisIs_A_VerySecure_32ByteKey!!'
 
-Preparation:
+# ## 2. CRYPTOGRAPHY FUNCTIONS ##
 
-Place all 16 proxy scripts, ip_config.py, crypto_manager.py, and gcs_controller.py into the same directory.
+# def encrypt_message(plaintext):
+#     """
+#     Encrypts a plaintext message using AES-256-GCM.
+#     A new random 12-byte nonce is generated for each message.
+#     The nonce is prepended to the ciphertext.
+#     [nonce (12 bytes)] + [ciphertext]
+#     """
+#     nonce = os.urandom(NONCE_IV_SIZE)
+#     aesgcm = AESGCM(PSK_AES)
+#     ciphertext = aesgcm.encrypt(nonce, plaintext, None) # No associated data
+#     return nonce + ciphertext
 
-Place your speck.py and hight_CBC.py (with its hight.py dependency) in that directory as well.
+# def decrypt_message(encrypted_message):
+#     """
+#     Decrypts an incoming message using AES-256-GCM.
+#     Splits the nonce, then decrypts and verifies.
+#     Returns plaintext or None if verification fails.
+#     """
+#     try:
+#         nonce = encrypted_message[:NONCE_IV_SIZE]
+#         ciphertext = encrypted_message[NONCE_IV_SIZE:]
+#         aesgcm = AESGCM(PSK_AES)
+#         plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+#         return plaintext
+#     except Exception as e: # Catches InvalidTag exception
+#         print(f"[AES GCS] Decryption failed: {e}")
+#         return None
 
-Terminal 1: Start the Manager
+# ## 3. NETWORKING THREADS ##
 
-code
-Shell
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-conda activate gcs-env
-python crypto_manager.py
+# def drone_to_gcs_thread():
+#     """Listens for encrypted telemetry and forwards decrypted data to GCS app."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+#     print(f"[AES GCS] Listening for encrypted drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
 
-You will see it start up and listen for commands. Leave this running.
+#     while True:
+#         encrypted_data, addr = sock.recvfrom(4096)
+#         plaintext = decrypt_message(encrypted_data)
+#         if plaintext:
+#             sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
 
-Terminal 2: Start a Drone Proxy
+# def gcs_to_drone_thread():
+#     """Listens for plaintext commands and sends encrypted data to the drone."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
+#     print(f"[AES GCS] Listening for plaintext GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
 
-code
-Shell
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-conda activate gcs-env
-# Let's start the drone-side AES proxy for testing
-python drone_aes.py
+#     while True:
+#         plaintext_data, addr = sock.recvfrom(4096)
+#         encrypted_command = encrypt_message(plaintext_data)
+#         sock.sendto(encrypted_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
 
-This will start the drone's half of the communication. Leave it running.
+# ## 4. MAIN LOGIC ##
 
-Terminal 3: Control the GCS
+# if __name__ == "__main__":
+#     print("--- GCS AES-256-GCM PROXY ---")
+#     thread1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
+#     thread2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
+#     thread1.start()
+#     thread2.start()
+#     thread1.join()
+#     thread2.join()
 
-code
-Shell
-download
-content_copy
-expand_less
-IGNORE_WHEN_COPYING_START
-IGNORE_WHEN_COPYING_END
-conda activate gcs-env
+# drone_aes.py
 
-# Command the manager to start the GCS AES proxy
-python gcs_controller.py switch c2
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # drone_aes.py
+# #
+# # Drone-Side Proxy for AES-256-GCM Cryptography
+# #
+# # PURPOSE:
+# #   - Listens for plaintext MAVLink telemetry from the flight controller.
+# #   - Encrypts it using AES-256-GCM.
+# #   - Sends the encrypted telemetry to the GCS.
+# #   - Listens for encrypted commands from the GCS.
+# #   - Decrypts them using AES-256-GCM.
+# #   - Forwards the plaintext commands to the flight controller.
+# #
+# # DEPENDENCIES:
+# #   - cryptography (pip install cryptography)
+# #   - ip_config.py
+# # ==============================================================================
 
-# Check the manager's status
-python gcs_controller.py status
-# Expected Response: OK: Running c2 (gcs_aes.py)
+# import socket
+# import threading
+# import os
+# from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+# from ip_config import *
 
-# Now switch to another algorithm, for example, Falcon
-python gcs_controller.py switch c8
+# ## 1. CONFIGURATION ##
 
-# Check the status again
-python gcs_controller.py status
-# Expected Response: OK: Running c8 (gcs_falcon.py)
+# # SECURITY WARNING: This key MUST be identical to the one in gcs_aes.py.
+# PSK_AES = b'ThisIs_A_VerySecure_32ByteKey!!'
 
-# Stop the currently running proxy
-python gcs_controller.py stop
+# ## 2. CRYPTOGRAPHY FUNCTIONS ##
 
-You have now built and tested the complete, robust backend for your GCS. The final step is to replace the calls from gcs_controller.py with button clicks in your gcs_mqtt_scheduler_gui.py. Your GUI just needs to send the simple text commands over a TCP socket to the manager.
+# def encrypt_message(plaintext):
+#     """Encrypts using AES-256-GCM, prepending a random 12-byte nonce."""
+#     nonce = os.urandom(NONCE_IV_SIZE)
+#     aesgcm = AESGCM(PSK_AES)
+#     ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+#     return nonce + ciphertext
 
----
-... I will continue this pattern for all 8 algorithms in the next response, as the total length exceeds the limit. The remaining scripts for **Camellia, SPECK, HIGHT, Kyber, Dilithium, and Falcon** will follow this exact standardized and documented format.
+# def decrypt_message(encrypted_message):
+#     """Decrypts using AES-256-GCM after splitting the nonce."""
+#     try:
+#         nonce = encrypted_message[:NONCE_IV_SIZE]
+#         ciphertext = encrypted_message[NONCE_IV_SIZE:]
+#         aesgcm = AESGCM(PSK_AES)
+#         plaintext = aesgcm.decrypt(nonce, ciphertext, None)
+#         return plaintext
+#     except Exception as e:
+#         print(f"[AES Drone] Decryption failed: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+
+# def telemetry_to_gcs_thread():
+#     """Listens for plaintext telemetry, encrypts, and sends to GCS."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
+#     print(f"[AES Drone] Listening for plaintext telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
+
+#     while True:
+#         plaintext_data, addr = sock.recvfrom(4096)
+#         encrypted_telemetry = encrypt_message(plaintext_data)
+#         sock.sendto(encrypted_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+
+# def commands_from_gcs_thread():
+#     """Listens for encrypted commands, decrypts, and forwards to flight controller."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+#     print(f"[AES Drone] Listening for encrypted GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
+
+#     while True:
+#         encrypted_data, addr = sock.recvfrom(4096)
+#         plaintext_command = decrypt_message(encrypted_data)
+#         if plaintext_command:
+#             sock.sendto(plaintext_command, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+
+# if __name__ == "__main__":
+#     print("--- DRONE AES-256-GCM PROXY ---")
+#     thread1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
+#     thread2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
+#     thread1.start()
+#     thread2.start()
+#     thread1.join()
+#     thread2.join()```
+
+# Of course. Here is the continuation of your framework, providing the remaining 6 pairs of crystal-clear, documented scripts.
+
+# A Quick Note on Dependencies for This Batch
+
+# The following scripts assume you have the pure Python implementations of speck.py and hight.py from your original codebase available in the same directory, as they are not standard installable packages.
+
+# For SPECK: Place your speck.py file in the same folder.
+
+# For HIGHT: Place your hight.py file in the same folder.
+
+# Step 3 (Continued): The 16 Crystal Clear Scripts
+# 3. Camellia (Symmetric Block Cipher - CBC Mode)
+
+# Method: Symmetric encryption using a PSK. Your cryptography library backend uses CBC mode.
+
+# Security Warning: CBC mode on its own does not provide authenticity. In a real system, you would need to add a Message Authentication Code (MAC), like HMAC, to prevent tampering. For simplicity, this example omits the MAC but it is a critical consideration. A random IV is used for each message.
+
+# gcs_camellia.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+
+# # ==============================================================================
+# # gcs_camellia.py
+# #
+# # GCS-Side Proxy for Camellia Cryptography (CBC Mode)
+# #
+# # PURPOSE:
+# #   Implements the GCS-side logic for Camellia encryption. It uses the
+# #   CustomCamelliaCipher class from your previous work, which is an excellent
+# #   way to leverage the `cryptography` library's backend.
+# #
+# # SECURITY WARNING:
+# #   This implementation uses CBC mode, which provides confidentiality but NOT
+# #   authenticity. An attacker could potentially modify ciphertext without
+# #   being detected. For a production system, you MUST add a Message
+# #   Authentication Code (e.g., HMAC-SHA256) to each message.
+# #
+# # DEPENDENCIES:
+# #   - cryptography (pip install cryptography)
+# #   - ip_config.py
+# #   - camellia.py (Your custom implementation)
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# from cryptography.hazmat.primitives.padding import PKCS7
+# from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+# from ip_config import *
+
+# ## 1. YOUR CUSTOM CAMELLIA IMPLEMENTATION ##
+# # This is based on the high-quality class you provided.
+# class CustomCamelliaCipher:
+#     def __init__(self, key):
+#         if len(key) not in (16, 24, 32):
+#             raise ValueError("Key must be 16, 24, or 32 bytes.")
+#         self.key = key
+#         self.block_size = 128  # Camellia block size is 128 bits (16 bytes)
+
+#     def encrypt(self, plaintext, iv):
+#         padder = PKCS7(self.block_size).padder()
+#         padded_data = padder.update(plaintext) + padder.finalize()
+#         cipher = Cipher(algorithms.Camellia(self.key), modes.CBC(iv))
+#         encryptor = cipher.encryptor()
+#         return encryptor.update(padded_data) + encryptor.finalize()
+
+#     def decrypt(self, ciphertext, iv):
+#         cipher = Cipher(algorithms.Camellia(self.key), modes.CBC(iv))
+#         decryptor = cipher.decryptor()
+#         padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+#         unpadder = PKCS7(self.block_size).unpadder()
+#         return unpadder.update(padded_plaintext) + unpadder.finalize()
+
+# ## 2. CONFIGURATION ##
+
+# # Pre-Shared Key. Must be 16, 24, or 32 bytes.
+# PSK_CAMELLIA = b'MySecureCamelliaKey_16Bytes12345'
+# camellia_cipher = CustomCamelliaCipher(PSK_CAMELLIA)
+
+# ## 3. CRYPTOGRAPHY FUNCTIONS ##
+
+# def encrypt_message(plaintext):
+#     """Encrypts using Camellia-CBC, prepending a random 16-byte IV."""
+#     iv = os.urandom(16)  # CBC requires a 16-byte IV
+#     ciphertext = camellia_cipher.encrypt(plaintext, iv)
+#     return iv + ciphertext
+
+# def decrypt_message(encrypted_message):
+#     """Decrypts using Camellia-CBC after splitting the IV."""
+#     try:
+#         iv = encrypted_message[:16]
+#         ciphertext = encrypted_message[16:]
+#         return camellia_cipher.decrypt(ciphertext, iv)
+#     except Exception as e:
+#         print(f"[Camellia GCS] Decryption failed: {e}")
+#         return None
+
+# ## 4. NETWORKING THREADS ##
+
+# def drone_to_gcs_thread():
+#     """Listens for encrypted telemetry and forwards decrypted data."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+#     print(f"[Camellia GCS] Listening for drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
+#     while True:
+#         encrypted_data, addr = sock.recvfrom(4096)
+#         plaintext = decrypt_message(encrypted_data)
+#         if plaintext:
+#             sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
+
+# def gcs_to_drone_thread():
+#     """Listens for plaintext commands and sends encrypted data."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
+#     print(f"[Camellia GCS] Listening for GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
+#     while True:
+#         plaintext_data, addr = sock.recvfrom(4096)
+#         encrypted_command = encrypt_message(plaintext_data)
+#         sock.sendto(encrypted_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+
+# ## 5. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- GCS CAMELLIA PROXY ---")
+#     t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+
+# drone_camellia.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # drone_camellia.py
+# #
+# # Drone-Side Proxy for Camellia Cryptography (CBC Mode)
+# #
+# # PURPOSE:
+# #   Mirrors the GCS-side proxy for Camellia, performing the opposite
+# #   encryption/decryption operations for the two MAVLink streams.
+# #
+# # SECURITY WARNING:
+# #   This implementation uses CBC mode, which provides confidentiality but NOT
+# #   authenticity. A separate Message Authentication Code (MAC) is required
+# #   for a secure production system.
+# #
+# # DEPENDENCIES:
+# #   - cryptography (pip install cryptography)
+# #   - ip_config.py
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# from cryptography.hazmat.primitives.padding import PKCS7
+# from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+# from ip_config import *
+
+# ## 1. YOUR CUSTOM CAMELLIA IMPLEMENTATION ##
+# class CustomCamelliaCipher:
+#     def __init__(self, key):
+#         if len(key) not in (16, 24, 32):
+#             raise ValueError("Key must be 16, 24, or 32 bytes.")
+#         self.key = key
+#         self.block_size = 128
+
+#     def encrypt(self, plaintext, iv):
+#         padder = PKCS7(self.block_size).padder()
+#         padded_data = padder.update(plaintext) + padder.finalize()
+#         cipher = Cipher(algorithms.Camellia(self.key), modes.CBC(iv))
+#         encryptor = cipher.encryptor()
+#         return encryptor.update(padded_data) + encryptor.finalize()
+
+#     def decrypt(self, ciphertext, iv):
+#         cipher = Cipher(algorithms.Camellia(self.key), modes.CBC(iv))
+#         decryptor = cipher.decryptor()
+#         padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+#         unpadder = PKCS7(self.block_size).unpadder()
+#         return unpadder.update(padded_plaintext) + unpadder.finalize()
+
+# ## 2. CONFIGURATION ##
+# PSK_CAMELLIA = b'MySecureCamelliaKey_16Bytes12345'
+# camellia_cipher = CustomCamelliaCipher(PSK_CAMELLIA)
+
+# ## 3. CRYPTOGRAPHY FUNCTIONS ##
+# def encrypt_message(plaintext):
+#     """Encrypts using Camellia-CBC, prepending a random 16-byte IV."""
+#     iv = os.urandom(16)
+#     ciphertext = camellia_cipher.encrypt(plaintext, iv)
+#     return iv + ciphertext
+
+# def decrypt_message(encrypted_message):
+#     """Decrypts using Camellia-CBC after splitting the IV."""
+#     try:
+#         iv = encrypted_message[:16]
+#         ciphertext = encrypted_message[16:]
+#         return camellia_cipher.decrypt(ciphertext, iv)
+#     except Exception as e:
+#         print(f"[Camellia Drone] Decryption failed: {e}")
+#         return None
+
+# ## 4. NETWORKING THREADS ##
+# def telemetry_to_gcs_thread():
+#     """Listens for plaintext telemetry, encrypts, and sends to GCS."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
+#     print(f"[Camellia Drone] Listening for telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
+#     while True:
+#         plaintext_data, addr = sock.recvfrom(4096)
+#         encrypted_telemetry = encrypt_message(plaintext_data)
+#         sock.sendto(encrypted_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+
+# def commands_from_gcs_thread():
+#     """Listens for encrypted commands, decrypts, and forwards to flight controller."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+#     print(f"[Camellia Drone] Listening for GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
+#     while True:
+#         encrypted_data, addr = sock.recvfrom(4096)
+#         plaintext_command = decrypt_message(encrypted_data)
+#         if plaintext_command:
+#             sock.sendto(plaintext_command, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
+
+# ## 5. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- DRONE CAMELLIA PROXY ---")
+#     t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+# 4. SPECK (Lightweight Symmetric Block Cipher - CBC Mode)
+
+# Method: Symmetric encryption using a PSK. Based on your pure Python speck.py file.
+
+# Security Warning: Same as Camellia. CBC mode requires a separate MAC for authenticity. A random IV is used.
+
+# Action Required: You must place your speck.py file in the same directory for the import to work.
+
+# gcs_speck.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # gcs_speck.py
+# #
+# # GCS-Side Proxy for SPECK Lightweight Cryptography (CBC Mode)
+# #
+# # PURPOSE:
+# #   Implements the GCS-side logic for SPECK encryption. It relies on your
+# #   custom `speck.py` module.
+# #
+# # SECURITY WARNING:
+# #   Like the Camellia example, this uses CBC mode which lacks authenticity.
+# #   A MAC (like HMAC) is required for a secure system.
+# #
+# # DEPENDENCIES:
+# #   - pycryptodome (for padding)
+# #   - ip_config.py
+# #   - speck.py (Your custom implementation must be in the same folder)
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# from Crypto.Util.Padding import pad, unpad
+# from speck import Python_SPECK # Assuming your class is named Python_SPECK
+# from ip_config import *
+
+# ## 1. CONFIGURATION ##
+# PSK_SPECK = b'MySecureSpeckKey'  # Must match the drone's key
+# # The IV for CBC mode will be generated randomly for each message.
+# # The IV in the Python_SPECK class constructor is just an initial placeholder.
+# IV_PLACEHOLDER = b'\x00' * 16
+
+# ## 2. CRYPTOGRAPHY FUNCTIONS ##
+
+# def encrypt_message(plaintext):
+#     """Encrypts using SPECK-CBC, prepending a random 16-byte IV."""
+#     iv = os.urandom(16)
+#     # The class seems to manage its IV state internally after initialization.
+#     # To encrypt each message with a new IV, we create a new cipher object.
+#     cipher = Python_SPECK(key=PSK_SPECK, IV=iv)
+#     # Pad the plaintext to be a multiple of the block size (16 bytes for Speck-128)
+#     padded_plaintext = pad(plaintext, cipher.block_size)
+#     ciphertext = cipher.encrypt(padded_plaintext)
+#     return iv + ciphertext
+
+# def decrypt_message(encrypted_message):
+#     """Decrypts using SPECK-CBC after splitting the IV."""
+#     try:
+#         iv = encrypted_message[:16]
+#         ciphertext = encrypted_message[16:]
+#         cipher = Python_SPECK(key=PSK_SPECK, IV=iv)
+#         decrypted_padded = cipher.decrypt(ciphertext)
+#         return unpad(decrypted_padded, cipher.block_size)
+#     except Exception as e:
+#         print(f"[SPECK GCS] Decryption failed: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+
+# def drone_to_gcs_thread():
+#     """Listens for encrypted telemetry and forwards decrypted data."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+#     print(f"[SPECK GCS] Listening for drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
+#     while True:
+#         encrypted_data, addr = sock.recvfrom(4096)
+#         plaintext = decrypt_message(encrypted_data)
+#         if plaintext:
+#             sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
+
+# def gcs_to_drone_thread():
+#     """Listens for plaintext commands and sends encrypted data."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
+#     print(f"[SPECK GCS] Listening for GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
+#     while True:
+#         plaintext_data, addr = sock.recvfrom(4096)
+#         encrypted_command = encrypt_message(plaintext_data)
+#         sock.sendto(encrypted_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- GCS SPECK PROXY ---")
+#     t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+
+# drone_speck.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # drone_speck.py
+# #
+# # Drone-Side Proxy for SPECK Lightweight Cryptography (CBC Mode)
+# #
+# # PURPOSE:
+# #   Mirrors the GCS-side SPECK proxy.
+# #
+# # SECURITY WARNING:
+# #   CBC mode requires a separate Message Authentication Code (MAC) for security.
+# #
+# # DEPENDENCIES:
+# #   - pycryptodome (for padding)
+# #   - ip_config.py
+# #   - speck.py (Your custom implementation must be in the same folder)
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# from Crypto.Util.Padding import pad, unpad
+# from speck import Python_SPECK
+# from ip_config import *
+
+# ## 1. CONFIGURATION ##
+# PSK_SPECK = b'MySecureSpeckKey'
+# IV_PLACEHOLDER = b'\x00' * 16
+
+# ## 2. CRYPTOGRAPHY FUNCTIONS ##
+
+# def encrypt_message(plaintext):
+#     """Encrypts using SPECK-CBC, prepending a random 16-byte IV."""
+#     iv = os.urandom(16)
+#     cipher = Python_SPECK(key=PSK_SPECK, IV=iv)
+#     padded_plaintext = pad(plaintext, cipher.block_size)
+#     ciphertext = cipher.encrypt(padded_plaintext)
+#     return iv + ciphertext
+
+# def decrypt_message(encrypted_message):
+#     """Decrypts using SPECK-CBC after splitting the IV."""
+#     try:
+#         iv = encrypted_message[:16]
+#         ciphertext = encrypted_message[16:]
+#         cipher = Python_SPECK(key=PSK_SPECK, IV=iv)
+#         decrypted_padded = cipher.decrypt(ciphertext)
+#         return unpad(decrypted_padded, cipher.block_size)
+#     except Exception as e:
+#         print(f"[SPECK Drone] Decryption failed: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+
+# def telemetry_to_gcs_thread():
+#     """Listens for plaintext telemetry, encrypts, and sends to GCS."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
+#     print(f"[SPECK Drone] Listening for telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
+#     while True:
+#         plaintext_data, addr = sock.recvfrom(4096)
+#         encrypted_telemetry = encrypt_message(plaintext_data)
+#         sock.sendto(encrypted_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+
+# def commands_from_gcs_thread():
+#     """Listens for encrypted commands, decrypts, and forwards to flight controller."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+#     print(f"[SPECK Drone] Listening for GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
+#     while True:
+#         encrypted_data, addr = sock.recvfrom(4096)
+#         plaintext_command = decrypt_message(encrypted_data)
+#         if plaintext_command:
+#             sock.sendto(plaintext_command, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- DRONE SPECK PROXY ---")
+#     t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+# 5. HIGHT (Lightweight Symmetric Block Cipher - CBC Mode)
+
+# Method: Symmetric encryption using a PSK. Based on your pure Python hight.py file.
+
+# Security Warning: Same as Camellia/SPECK. CBC mode requires a separate MAC.
+
+# Action Required: You must place your hight.py and hight_CBC.py files in the same directory.
+
+# gcs_hight.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # gcs_hight.py
+# #
+# # GCS-Side Proxy for HIGHT Lightweight Cryptography (CBC Mode)
+# #
+# # SECURITY WARNING:
+# #   CBC mode lacks authenticity. A MAC (like HMAC) is required.
+# #
+# # DEPENDENCIES:
+# #   - pycryptodome (for padding)
+# #   - ip_config.py
+# #   - hight.py, hight_CBC.py (Your implementations)
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# from Crypto.Util.Padding import pad, unpad
+# from hight_CBC import cbc_hight_encryption, cbc_hight_decryption
+# from ip_config import *
+
+# ## 1. CONFIGURATION ##
+# PSK_HIGHT_MK = [0x88, 0xE3, 0x4F, 0x8F, 0x08, 0x17, 0x79, 0xF1, 0xE9, 0xF3, 0x94, 0x37, 0x0A, 0xD4, 0x05, 0x89]
+# BLOCK_SIZE = 8 # HIGHT has a 64-bit (8-byte) block size
+
+# ## 2. CRYPTOGRAPHY FUNCTIONS ##
+# def encrypt_message(plaintext):
+#     """Encrypts using HIGHT-CBC, prepending a random 8-byte IV."""
+#     iv = list(os.urandom(BLOCK_SIZE))
+#     padded_plaintext = list(pad(plaintext, BLOCK_SIZE))
+#     ciphertext = cbc_hight_encryption(padded_plaintext, iv, PSK_HIGHT_MK)
+#     return bytes(iv) + bytes(ciphertext)
+
+# def decrypt_message(encrypted_message):
+#     """Decrypts using HIGHT-CBC after splitting the IV."""
+#     try:
+#         iv = list(encrypted_message[:BLOCK_SIZE])
+#         ciphertext = list(encrypted_message[BLOCK_SIZE:])
+#         decrypted_padded = cbc_hight_decryption(ciphertext, iv, PSK_HIGHT_MK)
+#         return unpad(bytes(decrypted_padded), BLOCK_SIZE)
+#     except Exception as e:
+#         print(f"[HIGHT GCS] Decryption failed: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+# def drone_to_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+#     print(f"[HIGHT GCS] Listening on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         plaintext = decrypt_message(data)
+#         if plaintext:
+#             sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
+
+# def gcs_to_drone_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
+#     print(f"[HIGHT GCS] Listening on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         encrypted = encrypt_message(data)
+#         sock.sendto(encrypted, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- GCS HIGHT PROXY ---")
+#     t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+
+# drone_hight.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # drone_hight.py
+# #
+# # Drone-Side Proxy for HIGHT Lightweight Cryptography (CBC Mode)
+# #
+# # SECURITY WARNING:
+# #   CBC mode lacks authenticity. A MAC (like HMAC) is required.
+# #
+# # DEPENDENCIES:
+# #   - pycryptodome (for padding)
+# #   - ip_config.py
+# #   - hight.py, hight_CBC.py (Your implementations)
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# from Crypto.Util.Padding import pad, unpad
+# from hight_CBC import cbc_hight_encryption, cbc_hight_decryption
+# from ip_config import *
+
+# ## 1. CONFIGURATION ##
+# PSK_HIGHT_MK = [0x88, 0xE3, 0x4F, 0x8F, 0x08, 0x17, 0x79, 0xF1, 0xE9, 0xF3, 0x94, 0x37, 0x0A, 0xD4, 0x05, 0x89]
+# BLOCK_SIZE = 8
+
+# ## 2. CRYPTOGRAPHY FUNCTIONS ##
+# def encrypt_message(plaintext):
+#     """Encrypts using HIGHT-CBC, prepending a random 8-byte IV."""
+#     iv = list(os.urandom(BLOCK_SIZE))
+#     padded_plaintext = list(pad(plaintext, BLOCK_SIZE))
+#     ciphertext = cbc_hight_encryption(padded_plaintext, iv, PSK_HIGHT_MK)
+#     return bytes(iv) + bytes(ciphertext)
+
+# def decrypt_message(encrypted_message):
+#     """Decrypts using HIGHT-CBC after splitting the IV."""
+#     try:
+#         iv = list(encrypted_message[:BLOCK_SIZE])
+#         ciphertext = list(encrypted_message[BLOCK_SIZE:])
+#         decrypted_padded = cbc_hight_decryption(ciphertext, iv, PSK_HIGHT_MK)
+#         return unpad(bytes(decrypted_padded), BLOCK_SIZE)
+#     except Exception as e:
+#         print(f"[HIGHT Drone] Decryption failed: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+# def telemetry_to_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
+#     print(f"[HIGHT Drone] Listening on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         encrypted = encrypt_message(data)
+#         sock.sendto(encrypted, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+
+# def commands_from_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+#     print(f"[HIGHT Drone] Listening on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         plaintext = decrypt_message(data)
+#         if plaintext:
+#             sock.sendto(plaintext, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- DRONE HIGHT PROXY ---")
+#     t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+# 6. KYBER + AES (Post-Quantum Hybrid Encryption)
+
+# Method: This is the correct, modern approach. We use Kyber (a PQC KEM) one time at the beginning to securely establish a shared secret. This secret is then used as the key for AES-256-GCM for all subsequent messages. This gives us both post-quantum security for the key exchange and the high speed of AES for data transmission.
+
+# Security: This is a very secure method, combining post-quantum key establishment with a fast, authenticated symmetric cipher.
+
+# gcs_kyber_hybrid.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # gcs_kyber_hybrid.py
+# #
+# # GCS-Side Proxy for Hybrid Post-Quantum Cryptography
+# #
+# # METHOD:
+# #   1. KEY EXCHANGE (PQC): Use Kyber1024 to securely establish a shared secret.
+# #      - GCS generates a Kyber keypair.
+# #      - GCS sends its public key to the Drone.
+# #      - Drone encapsulates a secret and sends the ciphertext back.
+# #      - GCS decapsulates to get the same shared secret.
+# #   2. DATA EXCHANGE (Symmetric): Use the shared secret as a key for AES-256-GCM
+# #      to encrypt and authenticate all subsequent MAVLink messages.
+# #
+# # This hybrid approach provides post-quantum security for the key exchange
+# # and the high performance of AES for the bulk data transfer.
+# #
+# # DEPENDENCIES:
+# #   - oqs (pip install oqs)
+# #   - cryptography (pip install cryptography)
+# #   - ip_config.py
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# import oqs
+# from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+# from ip_config import *
+
+# ## 1. POST-QUANTUM KEY EXCHANGE ##
+
+# print("[KYBER GCS] Starting Post-Quantum Key Exchange...")
+
+# # GCS generates a Kyber keypair.
+# kem = oqs.KeyEncapsulation("Kyber1024")
+# gcs_public_key = kem.generate_keypair()
+
+# # Use a simple TCP socket for the one-time key exchange for reliability.
+# # The server (GCS) waits for the client (Drone) to connect.
+# exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
+# exchange_sock.listen(1)
+# print(f"[KYBER GCS] Waiting for Drone to connect for key exchange on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
+# conn, addr = exchange_sock.accept()
+# print(f"[KYBER GCS] Drone connected from {addr}")
+
+# # Send the public key to the Drone.
+# conn.sendall(gcs_public_key)
+# print("[KYBER GCS] Public key sent.")
+
+# # Receive the ciphertext from the Drone.
+# ciphertext = conn.recv(4096)
+# print("[KYBER GCS] Ciphertext received.")
+
+# # Decapsulate the ciphertext to get the shared secret.
+# shared_secret = kem.decap_secret(ciphertext)
+
+# # The first 32 bytes of the shared secret will be our AES key.
+# AES_KEY = shared_secret[:32]
+# aesgcm = AESGCM(AES_KEY)
+# print("✅ [KYBER GCS] Secure shared key established successfully!")
+# conn.close()
+# exchange_sock.close()
+
+
+# ## 2. SYMMETRIC CRYPTOGRAPHY FUNCTIONS (using the established key) ##
+
+# def encrypt_message(plaintext):
+#     nonce = os.urandom(NONCE_IV_SIZE)
+#     ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+#     return nonce + ciphertext
+
+# def decrypt_message(encrypted_message):
+#     try:
+#         nonce = encrypted_message[:NONCE_IV_SIZE]
+#         ciphertext = encrypted_message[NONCE_IV_SIZE:]
+#         return aesgcm.decrypt(nonce, ciphertext, None)
+#     except Exception as e:
+#         print(f"[AES GCS] Decryption failed: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+
+# def drone_to_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+#     print(f"[KYBER GCS] Now listening for encrypted drone telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         plaintext = decrypt_message(data)
+#         if plaintext:
+#             sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
+
+# def gcs_to_drone_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
+#     print(f"[KYBER GCS] Now listening for plaintext GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         encrypted = encrypt_message(data)
+#         sock.sendto(encrypted, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- GCS KYBER HYBRID PROXY ---")
+#     t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+
+# drone_kyber_hybrid.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # drone_kyber_hybrid.py
+# #
+# # Drone-Side Proxy for Hybrid Post-Quantum Cryptography
+# #
+# # METHOD:
+# #   1. KEY EXCHANGE (PQC): Connects to the GCS to perform a Kyber key exchange.
+# #      - Receives the GCS's public key.
+# #      - Generates and encapsulates a shared secret.
+# #      - Sends the resulting ciphertext to the GCS.
+# #   2. DATA EXCHANGE (Symmetric): Uses the derived shared secret as a key for
+# #      AES-256-GCM to secure all MAVLink messages.
+# #
+# # DEPENDENCIES:
+# #   - oqs (pip install oqs)
+# #   - cryptography (pip install cryptography)
+# #   - ip_config.py
+# # ==============================================================================
+
+# import socket
+# import threading
+# import os
+# import time
+# import oqs
+# from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+# from ip_config import *
+
+# ## 1. POST-QUANTUM KEY EXCHANGE ##
+
+# print("[KYBER Drone] Starting Post-Quantum Key Exchange...")
+
+# # Drone acts as the client in the key exchange.
+# kem = oqs.KeyEncapsulation("Kyber1024")
+
+# # Connect to the GCS to exchange keys.
+# # Retry connection in case the GCS proxy isn't ready yet.
+# exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# while True:
+#     try:
+#         exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
+#         break
+#     except ConnectionRefusedError:
+#         print("[KYBER Drone] Connection refused. GCS not ready? Retrying in 2 seconds...")
+#         time.sleep(2)
+
+# print(f"[KYBER Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
+
+# # Receive the GCS's public key.
+# gcs_public_key = exchange_sock.recv(4096)
+# print("[KYBER Drone] Public key received.")
+
+# # Encapsulate a secret using the public key. This generates both the
+# # ciphertext (to send back) and the shared secret (to keep).
+# ciphertext, shared_secret = kem.encap_secret(gcs_public_key)
+
+# # Send the ciphertext back to the GCS.
+# exchange_sock.sendall(ciphertext)
+# print("[KYBER Drone] Ciphertext sent.")
+
+# # The first 32 bytes of the shared secret become our AES key.
+# AES_KEY = shared_secret[:32]
+# aesgcm = AESGCM(AES_KEY)
+# print("✅ [KYBER Drone] Secure shared key established successfully!")
+# exchange_sock.close()
+
+
+# ## 2. SYMMETRIC CRYPTOGRAPHY FUNCTIONS (using the established key) ##
+
+# def encrypt_message(plaintext):
+#     nonce = os.urandom(NONCE_IV_SIZE)
+#     ciphertext = aesgcm.encrypt(nonce, plaintext, None)
+#     return nonce + ciphertext
+
+# def decrypt_message(encrypted_message):
+#     try:
+#         nonce = encrypted_message[:NONCE_IV_SIZE]
+#         ciphertext = encrypted_message[NONCE_IV_SIZE:]
+#         return aesgcm.decrypt(nonce, ciphertext, None)
+#     except Exception as e:
+#         print(f"[AES Drone] Decryption failed: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+
+# def telemetry_to_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
+#     print(f"[KYBER Drone] Now listening for plaintext telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         encrypted = encrypt_message(data)
+#         sock.sendto(encrypted, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+
+# def commands_from_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+#     print(f"[KYBER Drone] Now listening for encrypted GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         plaintext = decrypt_message(data)
+#         if plaintext:
+#             sock.sendto(plaintext, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- DRONE KYBER HYBRID PROXY ---")
+#     t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+# 7. DILITHIUM (Post-Quantum Signature)
+
+# Method: This provides authenticity and integrity, but not confidentiality. Every message is sent in plaintext but is accompanied by a digital signature. The receiver can verify that the message came from the correct sender and was not altered in transit.
+
+# Security: Uses the NIST-standardized PQC signature scheme ML-DSA (Dilithium).
+
+# gcs_dilithium.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # gcs_dilithium.py
+# #
+# # GCS-Side Proxy for Post-Quantum Digital Signatures (ML-DSA/Dilithium)
+# #
+# # METHOD:
+# #   This proxy DOES NOT ENCRYPT data. It provides authenticity and integrity.
+# #   1. KEY EXCHANGE: GCS and Drone generate their own Dilithium keypairs and
+# #      exchange their public keys.
+# #   2. DATA EXCHANGE:
+# #      - Every plaintext MAVLink command from the GCS is signed with the GCS's
+# #        private key. The message and signature are sent to the drone.
+# #      - Every plaintext MAVLink telemetry packet from the drone is signed.
+# #      - The GCS verifies the signature on incoming telemetry using the drone's
+# #        public key before forwarding it.
+# #
+# # DEPENDENCIES:
+# #   - oqs (pip install oqs)
+# #   - ip_config.py
+# # ==============================================================================
+
+# import socket
+# import threading
+# from ip_config import *
+# import oqs
+
+# ## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
+
+# print("[DILITHIUM GCS] Starting PQC Public Key Exchange...")
+
+# # GCS generates its own signature keypair.
+# SIGNATURE_ALGORITHM = "Dilithium3"
+# gcs_signer = oqs.Signature(SIGNATURE_ALGORITHM)
+# gcs_public_key = gcs_signer.generate_keypair()
+# # The secret key is kept within the gcs_signer object.
+
+# # Use TCP for reliable key exchange.
+# exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
+# exchange_sock.listen(1)
+# print(f"[DILITHIUM GCS] Waiting for Drone to connect for key exchange on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
+# conn, addr = exchange_sock.accept()
+# print(f"[DILITHIUM GCS] Drone connected from {addr}")
+
+# # Exchange public keys: GCS sends first, then receives.
+# conn.sendall(gcs_public_key)
+# print("[DILITHIUM GCS] GCS public key sent.")
+# drone_public_key = conn.recv(4096)
+# print("[DILITHIUM GCS] Drone public key received.")
+# print("✅ [DILITHIUM GCS] Public key exchange complete!")
+# conn.close()
+# exchange_sock.close()
+
+
+# ## 2. SIGNATURE FUNCTIONS ##
+
+# # A separator to distinguish the message from the signature.
+# SEPARATOR = b'|SIGNATURE|'
+
+# def sign_message(plaintext):
+#     """Signs a message using the GCS's private key."""
+#     signature = gcs_signer.sign(plaintext)
+#     return plaintext + SEPARATOR + signature
+
+# def verify_message(signed_message):
+#     """
+#     Verifies a message from the drone using the drone's public key.
+#     Returns the plaintext message if valid, otherwise None.
+#     """
+#     try:
+#         plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
+#         verifier = oqs.Signature(SIGNATURE_ALGORITHM)
+#         is_valid = verifier.verify(plaintext, signature, drone_public_key)
+#         if is_valid:
+#             return plaintext
+#         else:
+#             print("[DILITHIUM GCS] !!! SIGNATURE VERIFICATION FAILED !!!")
+#             return None
+#     except (ValueError) as e:
+#         print(f"[DILITHIUM GCS] Malformed message received, could not split signature: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+
+# def drone_to_gcs_thread():
+#     """Listens for signed telemetry, verifies, and forwards plaintext."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+#     print(f"[DILITHIUM GCS] Listening for signed telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
+#     while True:
+#         data, addr = sock.recvfrom(8192) # Increased buffer for signature
+#         plaintext = verify_message(data)
+#         if plaintext:
+#             sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
+
+# def gcs_to_drone_thread():
+#     """Listens for plaintext commands, signs them, and sends to drone."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
+#     print(f"[DILITHIUM GCS] Listening for GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         signed_command = sign_message(data)
+#         sock.sendto(signed_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- GCS DILITHIUM SIGNATURE PROXY ---")
+#     t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+
+# drone_dilithium.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # drone_dilithium.py
+# #
+# # Drone-Side Proxy for Post-Quantum Digital Signatures (ML-DSA/Dilithium)
+# #
+# # METHOD:
+# #   Mirrors the GCS-side signature proxy.
+# #   1. KEY EXCHANGE: Connects to the GCS and exchanges public keys.
+# #   2. DATA EXCHANGE:
+# #      - Signs all outgoing telemetry with the Drone's private key.
+# #      - Verifies all incoming commands with the GCS's public key.
+# #
+# # DEPENDENCIES:
+# #   - oqs (pip install oqs)
+# #   - ip_config.py
+# # ==============================================================================
+
+# import socket
+# import threading
+# import time
+# from ip_config import *
+# import oqs
+
+# ## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
+
+# print("[DILITHIUM Drone] Starting PQC Public Key Exchange...")
+
+# # Drone generates its own signature keypair.
+# SIGNATURE_ALGORITHM = "Dilithium3"
+# drone_signer = oqs.Signature(SIGNATURE_ALGORITHM)
+# drone_public_key = drone_signer.generate_keypair()
+
+# # Connect to the GCS to exchange keys.
+# exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# while True:
+#     try:
+#         exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
+#         break
+#     except ConnectionRefusedError:
+#         print("[DILITHIUM Drone] Connection refused. Retrying in 2 seconds...")
+#         time.sleep(2)
+
+# print(f"[DILITHIUM Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
+
+# # Exchange public keys: Drone receives first, then sends.
+# gcs_public_key = exchange_sock.recv(4096)
+# print("[DILITHIUM Drone] GCS public key received.")
+# exchange_sock.sendall(drone_public_key)
+# print("[DILITHIUM Drone] Drone public key sent.")
+# print("✅ [DILITHIUM Drone] Public key exchange complete!")
+# exchange_sock.close()
+
+# ## 2. SIGNATURE FUNCTIONS ##
+# SEPARATOR = b'|SIGNATURE|'
+
+# def sign_message(plaintext):
+#     """Signs a message using the Drone's private key."""
+#     signature = drone_signer.sign(plaintext)
+#     return plaintext + SEPARATOR + signature
+
+# def verify_message(signed_message):
+#     """Verifies a message from the GCS using the GCS's public key."""
+#     try:
+#         plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
+#         verifier = oqs.Signature(SIGNATURE_ALGORITHM)
+#         is_valid = verifier.verify(plaintext, signature, gcs_public_key)
+#         return plaintext if is_valid else None
+#     except ValueError as e:
+#         print(f"[DILITHIUM Drone] Malformed message, could not split signature: {e}")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+# def telemetry_to_gcs_thread():
+#     """Listens for plaintext telemetry, signs it, and sends to GCS."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
+#     print(f"[DILITHIUM Drone] Listening for telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         signed_telemetry = sign_message(data)
+#         sock.sendto(signed_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+
+# def commands_from_gcs_thread():
+#     """Listens for signed commands, verifies, and forwards to flight controller."""
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+#     print(f"[DILITHIUM Drone] Listening for signed GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
+#     while True:
+#         data, addr = sock.recvfrom(8192)
+#         plaintext = verify_message(data)
+#         if plaintext:
+#             sock.sendto(plaintext, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- DRONE DILITHIUM SIGNATURE PROXY ---")
+#     t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+# 8. FALCON (Post-Quantum Signature)
+
+# Method: PQC Signature algorithm, providing authenticity and integrity. The logic is identical to Dilithium, only the algorithm name is changed, demonstrating the modularity of the framework.
+
+# Security: Uses the NIST-standardized PQC signature scheme Falcon.
+
+# gcs_falcon.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # gcs_falcon.py
+# #
+# # GCS-Side Proxy for Post-Quantum Digital Signatures (Falcon-512)
+# #
+# # METHOD:
+# #   This proxy is functionally identical to the Dilithium proxy but uses the
+# #   Falcon-512 algorithm. It provides authenticity and integrity for MAVLink
+# #   messages by signing them. It DOES NOT provide confidentiality.
+# #
+# # DEPENDENCIES:
+# #   - oqs (pip install oqs)
+# #   - ip_config.py
+# # ==============================================================================
+
+# import socket
+# import threading
+# from ip_config import *
+# import oqs
+
+# ## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
+
+# print("[FALCON GCS] Starting PQC Public Key Exchange...")
+# SIGNATURE_ALGORITHM = "Falcon-512"
+# gcs_signer = oqs.Signature(SIGNATURE_ALGORITHM)
+# gcs_public_key = gcs_signer.generate_keypair()
+
+# exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# exchange_sock.bind((GCS_HOST, PORT_KEY_EXCHANGE))
+# exchange_sock.listen(1)
+# print(f"[FALCON GCS] Waiting for Drone on {GCS_HOST}:{PORT_KEY_EXCHANGE}...")
+# conn, addr = exchange_sock.accept()
+# print(f"[FALCON GCS] Drone connected from {addr}")
+
+# conn.sendall(gcs_public_key)
+# print("[FALCON GCS] GCS public key sent.")
+# drone_public_key = conn.recv(4096)
+# print("[FALCON GCS] Drone public key received.")
+# print("✅ [FALCON GCS] Public key exchange complete!")
+# conn.close()
+# exchange_sock.close()
+
+# ## 2. SIGNATURE FUNCTIONS ##
+# SEPARATOR = b'|SIGNATURE|'
+
+# def sign_message(plaintext):
+#     signature = gcs_signer.sign(plaintext)
+#     return plaintext + SEPARATOR + signature
+
+# def verify_message(signed_message):
+#     try:
+#         plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
+#         verifier = oqs.Signature(SIGNATURE_ALGORITHM)
+#         if verifier.verify(plaintext, signature, drone_public_key):
+#             return plaintext
+#         print("[FALCON GCS] !!! SIGNATURE VERIFICATION FAILED !!!")
+#         return None
+#     except ValueError:
+#         print("[FALCON GCS] Malformed message, could not split signature.")
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+# def drone_to_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+#     print(f"[FALCON GCS] Listening for signed telemetry on {GCS_HOST}:{PORT_GCS_LISTEN_ENCRYPTED_TLM}")
+#     while True:
+#         data, addr = sock.recvfrom(8192)
+#         plaintext = verify_message(data)
+#         if plaintext:
+#             sock.sendto(plaintext, (GCS_HOST, PORT_GCS_FORWARD_DECRYPTED_TLM))
+
+# def gcs_to_drone_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((GCS_HOST, PORT_GCS_LISTEN_PLAINTEXT_CMD))
+#     print(f"[FALCON GCS] Listening for GCS commands on {GCS_HOST}:{PORT_GCS_LISTEN_PLAINTEXT_CMD}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         signed_command = sign_message(data)
+#         sock.sendto(signed_command, (DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- GCS FALCON SIGNATURE PROXY ---")
+#     t1 = threading.Thread(target=drone_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=gcs_to_drone_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+
+# drone_falcon.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # drone_falcon.py
+# #
+# # Drone-Side Proxy for Post-Quantum Digital Signatures (Falcon-512)
+# #
+# # METHOD:
+# #   Mirrors the GCS-side Falcon proxy, providing authenticity for telemetry
+# #   and verifying commands from the GCS.
+# #
+# # DEPENDENCIES:
+# #   - oqs (pip install oqs)
+# #   - ip_config.py
+# # ==============================================================================
+
+# import socket
+# import threading
+# import time
+# from ip_config import *
+# import oqs
+
+# ## 1. POST-QUANTUM KEY EXCHANGE (Public Keys for Signatures) ##
+
+# print("[FALCON Drone] Starting PQC Public Key Exchange...")
+# SIGNATURE_ALGORITHM = "Falcon-512"
+# drone_signer = oqs.Signature(SIGNATURE_ALGORITHM)
+# drone_public_key = drone_signer.generate_keypair()
+
+# exchange_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+# while True:
+#     try:
+#         exchange_sock.connect((GCS_HOST, PORT_KEY_EXCHANGE))
+#         break
+#     except ConnectionRefusedError:
+#         print("[FALCON Drone] Connection refused. Retrying in 2 seconds...")
+#         time.sleep(2)
+
+# print(f"[FALCON Drone] Connected to GCS at {GCS_HOST}:{PORT_KEY_EXCHANGE}")
+
+# gcs_public_key = exchange_sock.recv(4096)
+# print("[FALCON Drone] GCS public key received.")
+# exchange_sock.sendall(drone_public_key)
+# print("[FALCON Drone] Drone public key sent.")
+# print("✅ [FALCON Drone] Public key exchange complete!")
+# exchange_sock.close()
+
+# ## 2. SIGNATURE FUNCTIONS ##
+# SEPARATOR = b'|SIGNATURE|'
+
+# def sign_message(plaintext):
+#     signature = drone_signer.sign(plaintext)
+#     return plaintext + SEPARATOR + signature
+
+# def verify_message(signed_message):
+#     try:
+#         plaintext, signature = signed_message.rsplit(SEPARATOR, 1)
+#         verifier = oqs.Signature(SIGNATURE_ALGORITHM)
+#         return plaintext if verifier.verify(plaintext, signature, gcs_public_key) else None
+#     except ValueError:
+#         return None
+
+# ## 3. NETWORKING THREADS ##
+# def telemetry_to_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_PLAINTEXT_TLM))
+#     print(f"[FALCON Drone] Listening for telemetry on {DRONE_HOST}:{PORT_DRONE_LISTEN_PLAINTEXT_TLM}")
+#     while True:
+#         data, addr = sock.recvfrom(4096)
+#         signed_telemetry = sign_message(data)
+#         sock.sendto(signed_telemetry, (GCS_HOST, PORT_GCS_LISTEN_ENCRYPTED_TLM))
+
+# def commands_from_gcs_thread():
+#     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+#     sock.bind((DRONE_HOST, PORT_DRONE_LISTEN_ENCRYPTED_CMD))
+#     print(f"[FALCON Drone] Listening for signed GCS commands on {DRONE_HOST}:{PORT_DRONE_LISTEN_ENCRYPTED_CMD}")
+#     while True:
+#         data, addr = sock.recvfrom(8192)
+#         plaintext = verify_message(data)
+#         if plaintext:
+#             sock.sendto(plaintext, (DRONE_HOST, PORT_DRONE_FORWARD_DECRYPTED_CMD))
+
+# ## 4. MAIN LOGIC ##
+# if __name__ == "__main__":
+#     print("--- DRONE FALCON SIGNATURE PROXY ---")
+#     t1 = threading.Thread(target=telemetry_to_gcs_thread, daemon=True)
+#     t2 = threading.Thread(target=commands_from_gcs_thread, daemon=True)
+#     t1.start()
+#     t2.start()
+#     t1.join()
+#     t2.join()
+# Next Steps
+
+# You now have a complete, standardized, and documented set of 16 proxy scripts plus the central configuration file.
+
+# Test Locally: Place all 17 files in the same directory. Open two separate terminals, both with your (gcs-env) activated.
+
+# In terminal 1, run a GCS proxy: python gcs_kyber_hybrid.py
+
+# In terminal 2, run the matching Drone proxy: python drone_kyber_hybrid.py
+
+# They should connect, exchange keys, and then wait for data. You can now proceed to build and test your GCS Application and Cryptography Manager against these stable, well-defined components.
+
+# Build the Manager: Your local_crypto_manager.py is the final piece of the puzzle. It will be responsible for starting and stopping these scripts based on commands from your main GUI.
+# Excellent. We will now build the "brain" of your framework: the Cryptography Manager.
+
+# This is the most critical component for making your system robust and easy to control. It acts as a dedicated supervisor, and your main GCS application will give it simple commands without needing to worry about the complex details of managing processes.
+
+# We will create two new scripts:
+
+# crypto_manager.py: A background service that runs persistently. It listens for commands and physically starts and stops your 8 GCS proxy scripts.
+
+# gcs_controller.py: A simple command-line tool to send commands to the manager. Your main GUI will eventually perform this role, but this tool is perfect for testing and direct control.
+
+# Step 1: The Cryptography Manager
+
+# This script is the switchboard. You will start this once in a terminal and leave it running in the background. It does the hard work of process management.
+
+# crypto_manager.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+
+# # ==============================================================================
+# # crypto_manager.py
+# #
+# # PURPOSE:
+# #   Acts as a dedicated supervisor for the 8 GCS cryptographic proxies.
+# #   This script runs as a persistent background service. It listens on a local
+# #   TCP port for simple text commands (e.g., "SWITCH c1") from the main GCS
+# #   application or the gcs_controller.py tool.
+# #
+# #   This approach decouples process management from your main GUI, making the
+# #   entire system more robust, modular, and easier to debug.
+# #
+# # HOW IT WORKS:
+# #   1. Starts a TCP server on a local port.
+# #   2. Waits for a connection.
+# #   3. Receives a command (e.g., "SWITCH c2").
+# #   4. If a proxy is already running, it gracefully terminates it. This is
+# #      CRITICAL to free up the MAVLink network ports.
+# #   5. It looks up the command code (e.g., "c2") in its script map and starts
+# #      the corresponding proxy script (e.g., "gcs_kyber_hybrid.py") as a new
+# #      subprocess.
+# #   6. Sends a confirmation reply ("OK" or "ERROR") back to the controller.
+# #
+# # HOW TO RUN:
+# #   1. Make sure all 16 proxy scripts and ip_config.py are in the same directory.
+# #   2. Open a terminal and activate the conda environment: `conda activate gcs-env`
+# #   3. Run this script: `python crypto_manager.py`
+# #   4. Leave this terminal running.
+# # ==============================================================================
+
+# import socket
+# import subprocess
+# import threading
+# import os
+# import signal
+# import sys
+# import time
+
+# # --- CONFIGURATION ---
+# MANAGER_HOST = '127.0.0.1'  # Listen only on localhost for security
+# MANAGER_PORT = 5900         # Port for receiving commands
+
+# # This map is the "brain" of the manager. It connects the simple command
+# # codes (c1, c2, etc.) to the actual script filenames.
+# CRYPTO_MAP = {
+#     "c1": "gcs_ascon.py",
+#     "c2": "gcs_aes.py",
+#     "c3": "gcs_camellia.py",
+#     "c4": "gcs_speck.py",
+#     "c5": "gcs_hight.py",
+#     "c6": "gcs_kyber_hybrid.py",
+#     "c7": "gcs_dilithium.py",
+#     "c8": "gcs_falcon.py",
+# }
+
+# class CryptoManager:
+#     """
+#     Manages the lifecycle of GCS cryptographic proxy subprocesses.
+#     """
+#     def __init__(self):
+#         self.current_process = None
+#         self.current_code = None
+#         # Ensure we use the same Python interpreter that's running this script
+#         self.python_executable = sys.executable
+
+#     def stop_current_proxy(self):
+#         """Gracefully stops the currently running proxy process."""
+#         if self.current_process and self.current_process.poll() is None:
+#             print(f"[Manager] Stopping proxy '{self.current_code}' (PID: {self.current_process.pid})...")
+#             try:
+#                 # Use process group termination for robustness
+#                 if os.name == 'nt': # Windows
+#                     # Sends CTRL+C, more graceful than taskkill
+#                     self.current_process.send_signal(signal.CTRL_C_EVENT)
+#                 else: # Linux/macOS
+#                     os.killpg(os.getpgid(self.current_process.pid), signal.SIGTERM)
+                
+#                 self.current_process.wait(timeout=3) # Wait up to 3 seconds
+#                 print("[Manager] Process terminated gracefully.")
+#             except subprocess.TimeoutExpired:
+#                 print("[Manager] Process did not terminate gracefully. Forcing kill...")
+#                 self.current_process.kill() # Force kill if it doesn't respond
+#             except Exception as e:
+#                 print(f"[Manager] Error stopping process: {e}")
+#         self.current_process = None
+#         self.current_code = None
+#         # Short delay to allow OS to release network sockets
+#         time.sleep(0.5)
+
+#     def start_proxy(self, code):
+#         """Starts a new proxy based on the provided code."""
+#         if code not in CRYPTO_MAP:
+#             return f"ERROR: Unknown crypto code '{code}'"
+
+#         script_name = CRYPTO_MAP[code]
+#         script_path = os.path.join(os.path.dirname(__file__), script_name)
+
+#         if not os.path.exists(script_path):
+#             return f"ERROR: Script '{script_name}' not found."
+
+#         print(f"[Manager] Starting proxy '{code}': {script_name}...")
+#         try:
+#             # Creation flags for creating a new process group on Windows
+#             creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
+            
+#             self.current_process = subprocess.Popen(
+#                 [self.python_executable, script_path],
+#                 creationflags=creationflags,
+#                 preexec_fn=os.setsid if os.name != 'nt' else None # Create new session on POSIX
+#             )
+#             self.current_code = code
+#             # Give it a moment to start and check if it crashed immediately
+#             time.sleep(1)
+#             if self.current_process.poll() is not None:
+#                 return f"ERROR: Process for '{script_name}' terminated immediately."
+            
+#             print(f"[Manager] Started '{script_name}' successfully (PID: {self.current_process.pid}).")
+#             return f"OK: Switched to {code} ({script_name})"
+#         except Exception as e:
+#             return f"ERROR: Failed to start process for '{script_name}': {e}"
+
+#     def handle_command(self, command_str):
+#         """Parses and executes a command."""
+#         parts = command_str.strip().upper().split()
+#         command = parts[0]
+
+#         if command == "SWITCH" and len(parts) > 1:
+#             code = parts[1].lower()
+#             self.stop_current_proxy()
+#             response = self.start_proxy(code)
+#         elif command == "STOP":
+#             self.stop_current_proxy()
+#             response = "OK: Proxy stopped."
+#         elif command == "STATUS":
+#             if self.current_process and self.current_process.poll() is None:
+#                 response = f"OK: Running {self.current_code} ({CRYPTO_MAP.get(self.current_code)})"
+#             else:
+#                 response = "OK: No proxy running."
+#         else:
+#             response = "ERROR: Unknown command. Use SWITCH <code>, STOP, or STATUS."
+        
+#         return response
+
+# def handle_client_connection(conn, manager):
+#     """Handles a single client connection to the manager."""
+#     try:
+#         data = conn.recv(1024)
+#         if data:
+#             command = data.decode('utf-8')
+#             print(f"[Manager] Received command: {command.strip()}")
+#             response = manager.handle_command(command)
+#             conn.sendall(response.encode('utf-8'))
+#     except Exception as e:
+#         print(f"[Manager] Error handling client: {e}")
+#     finally:
+#         conn.close()
+
+# def run_manager():
+#     manager = CryptoManager()
+#     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+#     server_socket.bind((MANAGER_HOST, MANAGER_PORT))
+#     server_socket.listen(5)
+#     print(f"--- CRYPTOGRAPHY MANAGER ---")
+#     print(f"✅ Listening for commands on {MANAGER_HOST}:{MANAGER_PORT}")
+#     print("Run gcs_controller.py in another terminal to send commands.")
+
+#     try:
+#         while True:
+#             conn, addr = server_socket.accept()
+#             # No need for a new thread if commands are quick
+#             handle_client_connection(conn, manager)
+#     except KeyboardInterrupt:
+#         print("\n[Manager] Shutdown signal received.")
+#     finally:
+#         print("[Manager] Cleaning up...")
+#         manager.stop_current_proxy()
+#         server_socket.close()
+#         print("[Manager] Shutdown complete.")
+
+# if __name__ == "__main__":
+#     run_manager()
+# Step 2: The GCS Controller Tool
+
+# This is your simple, powerful tool for interacting with the manager.
+
+# gcs_controller.py
+
+# code
+# Python
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# # ==============================================================================
+# # gcs_controller.py
+# #
+# # PURPOSE:
+# #   A command-line tool to send control commands to the crypto_manager.py.
+# #   This simulates the action your main GCS GUI will take when the user
+# #   clicks a button to switch cryptographic algorithms.
+# #
+# #   It connects to the manager via TCP, sends a single command, prints the
+# #   response from the manager, and exits.
+# #
+# # HOW TO RUN:
+# #   1. Make sure crypto_manager.py is already running in another terminal.
+# #   2. Open a new terminal and activate the conda environment.
+# #   3. Run with a command. Examples:
+# #
+# #      # Switch to the ASCON proxy (c1)
+# #      python gcs_controller.py switch c1
+# #
+# #      # Switch to the Kyber Hybrid proxy (c6)
+# #      python gcs_controller.py switch c6
+# #
+# #      # Check the status of the manager
+# #      python gcs_controller.py status
+# #
+# #      # Stop the currently running proxy
+# #      python gcs_controller.py stop
+# # ==============================================================================
+
+# import socket
+# import argparse
+
+# # --- CONFIGURATION ---
+# # These MUST match the host and port in crypto_manager.py
+# MANAGER_HOST = '127.0.0.1'
+# MANAGER_PORT = 5900
+
+# def send_command(command):
+#     """Connects to the manager, sends a command, and prints the response."""
+#     try:
+#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+#             sock.connect((MANAGER_HOST, MANAGER_PORT))
+#             sock.sendall(command.encode('utf-8'))
+#             response = sock.recv(1024).decode('utf-8')
+#             print(f"Response from Manager: {response}")
+#     except ConnectionRefusedError:
+#         print(f"ERROR: Connection refused. Is crypto_manager.py running on {MANAGER_HOST}:{MANAGER_PORT}?")
+#     except Exception as e:
+#         print(f"An error occurred: {e}")
+
+# if __name__ == "__main__":
+#     parser = argparse.ArgumentParser(description="Send control commands to the Crypto Manager.")
+    
+#     # Using subparsers for a clean command structure like 'git push' or 'docker run'
+#     subparsers = parser.add_subparsers(dest="command", required=True, help="Available commands")
+
+#     # 'switch' command
+#     parser_switch = subparsers.add_parser("switch", help="Switch to a specific crypto proxy.")
+#     parser_switch.add_argument("code", type=str, help="The crypto code to switch to (e.g., c1, c2, ... c8).")
+
+#     # 'status' command
+#     parser_status = subparsers.add_parser("status", help="Check the current status of the crypto proxy.")
+
+#     # 'stop' command
+#     parser_stop = subparsers.add_parser("stop", help="Stop the currently running crypto proxy.")
+
+#     args = parser.parse_args()
+
+#     # Construct the command string from the parsed arguments
+#     if args.command == "switch":
+#         full_command = f"SWITCH {args.code}"
+#     else: # For 'status' and 'stop'
+#         full_command = args.command.upper()
+
+#     send_command(full_command)
+# How to Use This Framework
+
+# You are now ready to test the core logic of your system.
+
+# Preparation:
+
+# Place all 16 proxy scripts, ip_config.py, crypto_manager.py, and gcs_controller.py into the same directory.
+
+# Place your speck.py and hight_CBC.py (with its hight.py dependency) in that directory as well.
+
+# Terminal 1: Start the Manager
+
+# code
+# Shell
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# conda activate gcs-env
+# python crypto_manager.py
+
+# You will see it start up and listen for commands. Leave this running.
+
+# Terminal 2: Start a Drone Proxy
+
+# code
+# Shell
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# conda activate gcs-env
+# # Let's start the drone-side AES proxy for testing
+# python drone_aes.py
+
+# This will start the drone's half of the communication. Leave it running.
+
+# Terminal 3: Control the GCS
+
+# code
+# Shell
+# download
+# content_copy
+# expand_less
+# IGNORE_WHEN_COPYING_START
+# IGNORE_WHEN_COPYING_END
+# conda activate gcs-env
+
+# # Command the manager to start the GCS AES proxy
+# python gcs_controller.py switch c2
+
+# # Check the manager's status
+# python gcs_controller.py status
+# # Expected Response: OK: Running c2 (gcs_aes.py)
+
+# # Now switch to another algorithm, for example, Falcon
+# python gcs_controller.py switch c8
+
+# # Check the status again
+# python gcs_controller.py status
+# # Expected Response: OK: Running c8 (gcs_falcon.py)
+
+# # Stop the currently running proxy
+# python gcs_controller.py stop
+
+# You have now built and tested the complete, robust backend for your GCS. The final step is to replace the calls from gcs_controller.py with button clicks in your gcs_mqtt_scheduler_gui.py. Your GUI just needs to send the simple text commands over a TCP socket to the manager.
+
+# ---
+# ... I will continue this pattern for all 8 algorithms in the next response, as the total length exceeds the limit. The remaining scripts for **Camellia, SPECK, HIGHT, Kyber, Dilithium, and Falcon** will follow this exact standardized and documented format.
