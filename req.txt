@@ -1,0 +1,46 @@
+# ==============================================================================
+# requirements.txt for the GCS & Drone Cryptography Framework
+#
+# This file lists the essential Python packages required for the 8-algorithm
+# framework. It is designed to be clean, minimal, and robust.
+#
+# Installation:
+# 1. Activate your conda environment: `conda activate gcs-env`
+# 2. Run: `pip install -r requirements.txt`
+# ==============================================================================
+
+# -- Post-Quantum Cryptography --
+# The official Open Quantum Safe (OQS) library wrapper.
+# This single package provides Kyber, Dilithium, Falcon, and all other
+# NIST PQC algorithms. It replaces older packages like 'liboqs-python'
+# and 'pqcrypto'.
+oqs
+
+# -- Standard & Pre-Quantum Cryptography --
+# A high-level, industry-standard cryptography library.
+# We use this for its robust implementations of AES-GCM and the Camellia
+# backend for your custom class.
+cryptography
+
+# A versatile, lower-level cryptography library.
+# We use this for its implementation of ASCON and for its robust padding
+# utilities, which are helpful for the custom SPECK and HIGHT block ciphers.
+pycryptodome
+
+# -- Drone Communication & Control --
+# The standard library for MAVLink communication.
+# Essential for your GCS application to talk to the drone.
+pymavlink
+
+# The standard library for MQTT communication.
+# Used by your GCS application to send control signals (like crypto switching)
+# to the drone fleet.
+paho-mqtt
+
+# -- Optional Legacy Package --
+# You successfully installed the C++ Build Tools, so this will now install.
+# NOTE: Our framework uses your *custom* camellia.py, which is a better
+# solution. This is included here only for completeness or if you wish
+
+# to experiment with it separately. It is NOT required for our framework.
+python-camellia
