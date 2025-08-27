@@ -23,6 +23,11 @@
 GCS_HOST = "127.0.0.1"    # The primary IP address of the GCS machine.
 DRONE_HOST = "127.0.0.1"  # The primary IP address of the Drone machine.
 
+# --- DRONE ID ---
+# Stable identifier for the drone used in MQTT topics and certificate filenames.
+# Keep in sync with drone/ip_config.py. Example certs: <DRONE_ID>-cert.pem, <DRONE_ID>-key.pem
+DRONE_ID = "drone1"
+
 # --- NETWORK PORTS ---
 # A new, clean set of ports to avoid conflicts with old scripts.
 

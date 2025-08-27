@@ -100,9 +100,12 @@ sequenceDiagram
 
 ## Certificates and security
 
-- Files: `ca-cert.pem`, `<drone-id>-cert.pem`, `<drone-id>-key.pem`
-- Searched paths: `drone/certs`, `../certs`, `C:/mqtt/certs`, `/etc/mqtt/certs`, `/home/dev/mqtt/certs`
-- Hostname verification disabled when connecting to IP brokers; CA still required.
+- Put your TLS certs in `drone/certs/` using the DRONE_ID from `drone/ip_config.py`:
+  - `ca-cert.pem`
+  - `<DRONE_ID>-cert.pem` (e.g., `drone1-cert.pem`)
+  - `<DRONE_ID>-key.pem`  (e.g., `drone1-key.pem`)
+- The client also searches common locations (`../certs`, `C:/mqtt/certs`, `/etc/mqtt/certs`, `/home/dev/mqtt/certs`).
+- Hostname verification is disabled when connecting to IP brokers; CA validation is still required.
 
 ## IP configuration (runtime vs persistent)
 

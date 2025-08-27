@@ -129,8 +129,11 @@ sequenceDiagram
 
 ## Certificates and security
 
-- Files: `ca-cert.pem`, `<client-id>-cert.pem`, `<client-id>-key.pem`
-- Searched paths: `gcs/certs`, `../certs`, `C:/mqtt/certs`, `/etc/mqtt/certs`, `/home/dev/mqtt/certs`
+- Put your TLS certs in `gcs/certs/`:
+  - `ca-cert.pem`
+  - `gcs-cert.pem`
+  - `gcs-key.pem`
+- The client also searches common locations (`../certs`, `C:/mqtt/certs`, `/etc/mqtt/certs`, `/home/dev/mqtt/certs`).
 - Optional pinning stub is available in code for strict deployments.
 
 ## IP configuration (runtime vs persistent)
