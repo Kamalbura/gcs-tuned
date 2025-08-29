@@ -1,0 +1,57 @@
+# UAVPI PKI Master OpenSSL Configuration
+# Provides v3 profiles for CA, server, and client certificates with branded defaults.
+
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir               = .
+database          = $dir/index.txt
+new_certs_dir     = $dir/newcerts
+serial            = $dir/serial
+private_key       = $dir/ca-key.pem
+certificate       = $dir/ca-cert.pem
+
+# Default request options
+[ req ]
+default_bits        = 4096
+prompt              = no
+default_md          = sha256
+distinguished_name  = req_distinguished_name
+x509_extensions     = v3_ca
+
+[ req_distinguished_name ]
+countryName_default             = IN
+stateOrProvinceName_default     = Telangana
+localityName_default            = Hyderabad
+organizationName_default        = UAVPI Mission Systems
+organizationalUnitName_default  = UAVPI Developers
+emailAddress_default            = contact@uavpi.local
+
+# v3 extensions
+[ v3_ca ]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always,issuer
+
+[ v3_server ]
+basicConstraints = CA:FALSE
+keyUsage = critical,digitalSignature,keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names_server
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+
+[ v3_client ]
+basicConstraints = CA:FALSE
+keyUsage = critical,digitalSignature
+extendedKeyUsage = clientAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+
+[ alt_names_server ]
+DNS.1 = uavpi-broker.local
+DNS.2 = localhost
+IP.1 = 127.0.0.1
+IP.2 = 192.168.0.100

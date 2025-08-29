@@ -20,8 +20,8 @@
 
 # --- HOST ADDRESSES ---
 # Change these when you move from local testing to a real network.
-GCS_HOST = "127.0.0.1"    # The primary IP address of the GCS machine.
-DRONE_HOST = "127.0.0.1"  # The primary IP address of the Drone machine.
+GCS_HOST = "192.168.0.100"    # The primary IP address of the GCS machine.
+DRONE_HOST = "192.168.0.105"  # The primary IP address of the Drone machine.
 
 # --- DRONE ID ---
 # Stable identifier for the drone used in MQTT topics and certificate filenames.

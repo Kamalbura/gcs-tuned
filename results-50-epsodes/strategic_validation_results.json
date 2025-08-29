@@ -1,0 +1,144 @@
+{
+  "normal_operation": {
+    "mean_reward": 215.6933333333337,
+    "std_reward": 145.9993906570238,
+    "min_reward": 101.83500000000042,
+    "max_reward": 421.79000000000053,
+    "mean_episode_length": 500.0,
+    "std_episode_length": 0.0,
+    "action_distribution": [
+      1164.0,
+      336.0,
+      0.0,
+      0.0
+    ],
+    "action_distribution_normalized": [
+      0.776,
+      0.224,
+      0.0,
+      0.0
+    ],
+    "terminal_states": [],
+    "num_episodes": 3
+  },
+  "under_attack": {
+    "mean_reward": 865.8400000000016,
+    "std_reward": 4.879612347990142,
+    "min_reward": 860.9450000000039,
+    "max_reward": 872.5000000000009,
+    "mean_episode_length": 500.0,
+    "std_episode_length": 0.0,
+    "action_distribution": [
+      1440.0,
+      60.0,
+      0.0,
+      0.0
+    ],
+    "action_distribution_normalized": [
+      0.96,
+      0.04,
+      0.0,
+      0.0
+    ],
+    "terminal_states": [],
+    "num_episodes": 3
+  },
+  "low_battery": {
+    "mean_reward": 321.1666666666661,
+    "std_reward": 66.5784072020016,
+    "min_reward": 234.7999999999992,
+    "max_reward": 396.8249999999987,
+    "mean_episode_length": 357.6666666666667,
+    "std_episode_length": 21.01322334996598,
+    "action_distribution": [
+      1073.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "action_distribution_normalized": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "terminal_states": [
+      {
+        "battery_percent": null,
+        "temperature": null,
+        "threat_level": 1
+      },
+      {
+        "battery_percent": null,
+        "temperature": null,
+        "threat_level": 2
+      },
+      {
+        "battery_percent": null,
+        "temperature": null,
+        "threat_level": 2
+      }
+    ],
+    "num_episodes": 3
+  },
+  "thermal_stress": {
+    "mean_reward": 532.5733333333325,
+    "std_reward": 45.76227965135336,
+    "min_reward": 478.4450000000013,
+    "max_reward": 590.3599999999956,
+    "mean_episode_length": 500.0,
+    "std_episode_length": 0.0,
+    "action_distribution": [
+      1346.0,
+      154.0,
+      0.0,
+      0.0
+    ],
+    "action_distribution_normalized": [
+      0.8973333333333333,
+      0.10266666666666667,
+      0.0,
+      0.0
+    ],
+    "terminal_states": [],
+    "num_episodes": 3
+  },
+  "combined_stress": {
+    "mean_reward": 418.86666666666633,
+    "std_reward": 38.648508667504494,
+    "min_reward": 390.1500000000009,
+    "max_reward": 473.49999999999875,
+    "mean_episode_length": 332.6666666666667,
+    "std_episode_length": 30.684777260973487,
+    "action_distribution": [
+      998.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "action_distribution_normalized": [
+      1.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "terminal_states": [
+      {
+        "battery_percent": null,
+        "temperature": null,
+        "threat_level": 2
+      },
+      {
+        "battery_percent": null,
+        "temperature": null,
+        "threat_level": 2
+      },
+      {
+        "battery_percent": null,
+        "temperature": null,
+        "threat_level": 2
+      }
+    ],
+    "num_episodes": 3
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "normal_operation": {
+    "mean_reward": -61.683691700912824,
+    "std_reward": 3.5781001639959813,
+    "min_reward": -65.38871357616324,
+    "max_reward": -56.846417648177976,
+    "mean_episode_length": 53.0,
+    "std_episode_length": 6.683312551921141,
+    "action_distribution": [
+      0.0,
+      34.0,
+      125.0
+    ],
+    "action_distribution_normalized": [
+      0.0,
+      0.2138364779874214,
+      0.7861635220125787
+    ],
+    "terminal_states": [
+      {
+        "battery_percent": 99.79781448114775,
+        "temperature": 85.48053601341873,
+        "threat_level": 1
+      },
+      {
+        "battery_percent": 99.74131631631616,
+        "temperature": 85.19661100287348,
+        "threat_level": 0
+      },
+      {
+        "battery_percent": 99.77944194194185,
+        "temperature": 85.3948239139696,
+        "threat_level": 0
+      }
+    ],
+    "num_episodes": 3
+  },
+  "under_attack": {
+    "mean_reward": -15.563333799185349,
+    "std_reward": 8.042885211443048,
+    "min_reward": -22.124384843228412,
+    "max_reward": -4.2362897328012945,
+    "mean_episode_length": 52.666666666666664,
+    "std_episode_length": 4.642796092394707,
+    "action_distribution": [
+      10.0,
+      56.0,
+      92.0
+    ],
+    "action_distribution_normalized": [
+      0.06329113924050633,
+      0.35443037974683544,
+      0.5822784810126582
+    ],
+    "terminal_states": [
+      {
+        "battery_percent": 99.76526943610261,
+        "temperature": 85.4264002300791,
+        "threat_level": 3
+      },
+      {
+        "battery_percent": 99.80756589923247,
+        "temperature": 85.70179388876537,
+        "threat_level": 2
+      },
+      {
+        "battery_percent": 99.79403987320639,
+        "temperature": 85.21789229760812,
+        "threat_level": 2
+      }
+    ],
+    "num_episodes": 3
+  },
+  "low_battery": {
+    "mean_reward": -182.04432509786542,
+    "std_reward": 69.75386020758276,
+    "min_reward": -243.77681139851322,
+    "max_reward": -84.54305645686021,
+    "mean_episode_length": 98.66666666666667,
+    "std_episode_length": 3.2998316455372216,
+    "action_distribution": [
+      296.0,
+      0.0,
+      0.0
+    ],
+    "action_distribution_normalized": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "terminal_states": [
+      {
+        "battery_percent": 39.77221388054741,
+        "temperature": 86.12657770961307,
+        "threat_level": 3
+      },
+      {
+        "battery_percent": 39.755251084417964,
+        "temperature": 85.22212130913937,
+        "threat_level": 3
+      },
+      {
+        "battery_percent": 39.755251084417964,
+        "temperature": 85.36423250269007,
+        "threat_level": 1
+      }
+    ],
+    "num_episodes": 3
+  },
+  "thermal_stress": {
+    "mean_reward": -35.122311730235054,
+    "std_reward": 6.825686253295896,
+    "min_reward": -43.58633989785239,
+    "max_reward": -26.870949487087103,
+    "mean_episode_length": 20.0,
+    "std_episode_length": 4.08248290463863,
+    "action_distribution": [
+      0.0,
+      40.0,
+      20.0
+    ],
+    "action_distribution_normalized": [
+      0.0,
+      0.6666666666666666,
+      0.3333333333333333
+    ],
+    "terminal_states": [
+      {
+        "battery_percent": 99.92129629629622,
+        "temperature": 85.43969339986867,
+        "threat_level": 0
+      },
+      {
+        "battery_percent": 99.94383967300627,
+        "temperature": 85.15563135148399,
+        "threat_level": 0
+      },
+      {
+        "battery_percent": 99.90605188521843,
+        "temperature": 85.97865757924222,
+        "threat_level": 0
+      }
+    ],
+    "num_episodes": 3
+  },
+  "combined_stress": {
+    "mean_reward": -140.87427979718106,
+    "std_reward": 19.88373130237843,
+    "min_reward": -167.79965413261132,
+    "max_reward": -120.38931960497519,
+    "mean_episode_length": 50.0,
+    "std_episode_length": 7.2571803523590805,
+    "action_distribution": [
+      150.0,
+      0.0,
+      0.0
+    ],
+    "action_distribution_normalized": [
+      1.0,
+      0.0,
+      0.0
+    ],
+    "terminal_states": [
+      {
+        "battery_percent": 34.89579996663339,
+        "temperature": 85.47085057229627,
+        "threat_level": 3
+      },
+      {
+        "battery_percent": 34.85460460460473,
+        "temperature": 85.17589435359007,
+        "threat_level": 3
+      },
+      {
+        "battery_percent": 34.886106940273706,
+        "temperature": 85.05785705673478,
+        "threat_level": 3
+      }
+    ],
+    "num_episodes": 3
+  }
+}

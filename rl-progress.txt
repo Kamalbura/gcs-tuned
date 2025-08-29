@@ -1,0 +1,170 @@
+UAV Security RL Progress Log
+Date: 2025-08-29
+
+Sections:
+1) Agent/Environment configuration
+2) Reward function parameters
+3) Model parameters / training hyperparameters
+4) Validation results (tactical)
+5) Validation results (strategic)
+6) Observations and next steps
+
+--- 1) Agent/Environment configuration ---
+Tactical environment (ddos_rl/uav_security_env.py::UAVSecurityEnv)
+- Observation space: MultiDiscrete [Threat(0..3), Battery(0..3), Thermal(0..2), CryptoDraw(0..2)]
+- Action space (3):
+  0 = CONSERVE (no DDoS model)
+  1 = MONITOR (XGBOOST)
+  2 = INVESTIGATE (TST)
+- Dynamics (key):
+  - Threat process with occurrence/escalation/de-escalation probabilities
+  - Battery drain from base power + crypto + DDoS model power
+  - Temperature evolves from base with power and noise
+  - Termination: battery <= 0 or temperature >= 85C, truncate at max_steps
+- Defaults: initial_battery 100%, step_seconds 2.0, max_steps 500
+
+Strategic environment (ddos_rl/uav_security_env.py::StrategicCryptoEnv)
+- Observation space: MultiDiscrete [Threat(0..2), AvgBattery(0..2), MissionPhase(0..3)]
+- Action space (4):
+  0 = KYBER
+  1 = DILITHIUM
+  2 = SPHINCS
+  3 = FALCON
+- Dynamics (key):
+  - Threat level evolves with simple Markovian rules
+  - Avg battery drains per-drone with noise; higher drains in phases [1,2]
+  - Mission phase rotates periodically with random jumps
+  - Truncate at max_steps or terminate if battery <= 0
+- Defaults: initial_battery 100%, drone_count 3, max_steps 500
+
+--- 2) Reward function parameters ---
+Tactical reward (UAVSecurityEnv._calculate_reward)
+- Weights: w_security=2.0, w_power=1.0, w_thermal=1.5, w_battery=2.5
+- Security component:
+  - If DDoS model = TST: reward += 0.97 * (threat/3)
+  - If DDoS model = XGBOOST: reward += 0.85 * (threat/3)
+  - If no model: reward += 0.1 * (threat/3)
+  - Penalty: if threat==3 and not TST → -1.0
+- Power penalty: total_power_draw / 15.0
+- Thermal penalty: ((temp - 45)/40)^2
+- Battery penalty: 1.0 if battery < 20%, else 0.0
+- Net reward: 2*security - 1*power - 1.5*thermal - 2.5*batteryLow
+
+Strategic reward (StrategicCryptoEnv._calculate_reward)
+- Weights: w_security=2.0, w_power=1.0, w_latency=1.0
+- Security score by crypto (scaled 0..1): KYBER 0.85, DILITHIUM 0.95, SPHINCS 0.99, FALCON 0.90
+  - security_reward = security_score * (0.5 + min(1.0, threat*0.5))
+- Power penalty = crypto.power_draw * battery_factor, where battery_factor:
+  - 2.0 if avg_battery < 30, 1.5 if < 70, else 1.0
+- Latency penalty = crypto.latency * mission_factor, where mission_factor:
+  - 2.0 if mission_phase == 2, 0.5 if phase == 0, else 1.0
+- Switching penalty: -0.2 when crypto changes from previous step
+- Net reward: 2*security - 1*power - 1*latency - switch_cost
+
+--- 3) Model parameters / training hyperparameters ---
+SafeQLearningAgent (ddos_rl/safe_q_agent.py)
+- Tabular Q-learning over discrete state x action
+- Q-table shape:
+  - Tactical: (4, 4, 3, 3, 3)
+  - Strategic: (3, 3, 4, 4)
+- Policy: epsilon-greedy
+  - epsilon start: 1.0; min_epsilon: 0.05; epsilon_decay: 0.995 per learn
+- Learning: alpha=0.1, gamma=0.98
+- Async learner: experience queue with background update thread
+- Persistence: q_table.npy + meta.json (atomic write), load tolerant to meta parse
+- Training harness:
+  - Episodes: configurable; smoke used 50 for each agent
+  - Evaluation every N episodes to select best checkpoint
+
+--- 4) Validation results (tactical) ---
+Source: results-basic/tactical_validation_results.json (3-episode per scenario smoke)
+- normal_operation:
+  - mean_reward ≈ -61.68; mean_len ≈ 53
+  - actions: mostly INVESTIGATE (TST) ~79%, some MONITOR ~21%, no CONSERVE
+  - term by thermal limit at ~85C; battery remains ~99.7–99.9%
+- under_attack:
+  - mean_reward ≈ -15.56; mean_len ≈ 52.7
+  - actions: INVESTIGATE 58%, MONITOR 35%, some CONSERVE 6%
+  - higher threat levels (2-3) seen; still thermal-limited
+- low_battery:
+  - mean_reward ≈ -182.04; mean_len ≈ 98.7
+  - actions: CONSERVE 100%
+  - rationale: heavy battery penalty discourages DDoS models
+- thermal_stress:
+  - mean_reward ≈ -35.12; mean_len ≈ 20
+  - actions: MONITOR 67%, INVESTIGATE 33%, thermal termination dominates
+- combined_stress:
+  - mean_reward ≈ -140.87; mean_len ≈ 50
+  - actions: CONSERVE 100%
+
+Interpretation (tactical):
+- The agent learns sensible policies:
+  - Prefers TST under higher threat unless constrained by battery/thermal
+  - Falls back to CONSERVE under low battery or combined stress
+  - Thermal ceilings (85C) frequently end episodes; temperature dominates termination in nominal/attack scenarios with short runs
+- Negative rewards in thermal/low-battery configurations are expected due to power/thermal penalties and short horizons.
+
+--- 5) Validation results (strategic) ---
+Source: results/strategic_validation_results.json (3-episode per scenario smoke)
+- Across scenarios, the agent overwhelmingly selects action 0 (KYBER) (≥90% of steps), with small fraction of DILITHIUM in some cases
+- Rewards are positive and relatively high; episodes usually run full length except when battery is configured to drain faster (low_battery/combined_stress)
+- Example metrics:
+  - normal_operation: mean_reward ≈ 215.7, len = 500, actions: KYBER 77.6%, DILITHIUM 22.4%
+  - under_attack: mean_reward ≈ 865.84, len = 500, actions: KYBER 96%, DILITHIUM 4%
+  - low_battery: mean_reward ≈ 321.17, mean_len ≈ 357.7, actions: KYBER 100%
+  - thermal_stress: mean_reward ≈ 532.57, len = 500, actions: KYBER 89.7%
+  - combined_stress: mean_reward ≈ 418.87, mean_len ≈ 332.7, actions: KYBER 100%
+
+Interpretation (strategic):
+- With current reward shaping, KYBER (balanced security/power/latency) is favored in most conditions; small DILITHIUM usage appears under normal ops where latency/power headroom allows higher security.
+- Positive rewards and long episodes indicate no hard thermal cap in strategic env; termination arises from battery drain in stress configs.
+
+--- 6) Observations and next steps ---
+Observations:
+- Tactical env’s thermal cap (85C) drives many terminations; consider adjusting base temperature, cooling model, or TST power to lengthen episodes.
+- Tactical rewards are negative in many scenarios due to penalty scales; could rescale power/thermal weights for clearer improvement signal.
+- Strategic agent’s action skew (mostly KYBER) suggests either security-benefit outweighs latency/power or switching cost discourages exploration; revisit weights.
+
+Proposed next steps:
+1) Tactical tuning
+   - Reduce w_thermal from 1.5→1.0, or increase base cooling to reduce frequent thermal termination.
+   - Slightly reduce TST power_draw entries to make it viable longer under moderate threat.
+2) Strategic tuning
+   - Introduce mild threat-linked switching bonus to allow DILITHIUM/SPHINCS under high threat.
+   - Increase latency penalty in mission_phase==2 to emphasize responsiveness.
+3) Training regimen
+   - Run >5k episodes with decaying epsilon to stabilize policies; enable periodic eval curves already in logs/.
+4) Logging/metrics
+   - Add CSV summaries of action frequencies and episode outcomes; already plotting saved under results/ and logs/.
+
+Artifacts on disk:
+- Models: models/tactical_best|final/, models/strategic_best|final/
+- Training plots: logs/*_training_curves.png
+- Validation: results/*strategic*_*.png/json and results-basic/*tactical*_*.png/json (if present)
+
+--- 2025-08-29: Extended training (2,000 episodes) & 25-episode validation ---
+Procedures executed:
+- Tactical: trained 2,000 episodes; validated 25 episodes per scenario.
+- Strategic: trained 2,000 episodes; validated 25 episodes per scenario.
+
+Tactical validation (latest):
+- normal_operation: mean_reward -68.11, mean_len 65.36; actions: CONSERVE 41.68%, MONITOR 17.01%, INVESTIGATE 41.31%. Terminations: thermal ~85.1–86.5 C; battery ~99.73–99.81%.
+- under_attack: mean_reward -3.15, mean_len 50.20; actions: CONSERVE 0%, MONITOR 30.28%, INVESTIGATE 69.72%. Thermal-limited; behavior prefers TST under threat as desired.
+- low_battery: mean_reward -226.61, mean_len 102.08; actions: CONSERVE 100%. Terminations with battery ~39.7% (aggressive drain and penalties drive early stop and negative rewards).
+- thermal_stress: mean_reward -31.95, mean_len 24.36; actions: CONSERVE 47.62%, MONITOR 35.80%, INVESTIGATE 16.58%. Strong thermal cap impact (short episodes).
+- combined_stress: mean_reward -139.41, mean_len 49.36; actions: CONSERVE 100%. Battery around mid-30% at termination; heavy constraints.
+
+Strategic validation (latest):
+- normal_operation: mean_reward 259.21, len 500; actions: KYBER 23.09%, DILITHIUM 57.88%, SPHINCS 5.31%, FALCON 13.72% (shift toward DILITHIUM vs earlier runs).
+- under_attack: mean_reward 821.74, len 500; actions: KYBER 43.02%, DILITHIUM 17.18%, SPHINCS 15.70%, FALCON 24.09% (KYBER leads, with healthy mix under pressure).
+- low_battery: mean_reward 332.14, mean_len 366.64; actions: KYBER 80.82%, DILITHIUM 16.29%, others ~2.9%. Terminated by battery depletion (no thermal bound in this env).
+- thermal_stress: mean_reward 472.29, len 500; actions: KYBER 23.94%, DILITHIUM 42.82%, SPHINCS 11.16%, FALCON 22.07% (high DILITHIUM share when latency cost is moderate).
+- combined_stress: mean_reward 380.27, mean_len 313.88; actions: KYBER 88.58%, others minor (power dominates choice).
+
+Behavioral takeaways:
+- Tactical: Longer training sharpened policies—no CONSERVE under attack, balanced CONSERVE vs TST in normal. Episodes remain thermal-terminated; negative rewards are penalty-driven more than failure. Consider reducing w_thermal or increasing base cooling; optionally lower TST power to sustain INVESTIGATE longer.
+- Strategic: Policy now prefers higher-security DILITHIUM in normal/thermal conditions, indicating security weight dominates when latency/power are acceptable; under tight battery or combined stress, KYBER dominates due to lower power cost. This aligns with the current reward shaping.
+
+Next tuning proposals:
+- Tactical: lower w_thermal from 1.5→1.0 and/or increase cooling; reduce TST power draw slightly; optionally raise thermal cap from 85→87 C to reduce premature terminations.
+- Strategic: increase latency penalty during mission_phase=2; consider threat-linked bonus for switching to high-security algos under peak threats; revisit security scores if DILITHIUM usage should be reduced.
